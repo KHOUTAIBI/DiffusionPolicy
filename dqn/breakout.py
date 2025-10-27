@@ -1,0 +1,64 @@
+from dqn import *
+
+# Defining the  gym environment
+gym.register_envs(ale_py)
+env = gym.make('BreakoutNoFrameskip-v4')
+env = AtariPreprocessing(env)
+env = FrameStackObservation(env, 4)
+n_episodes = 1000
+
+# Defining the agent class and the neural network 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+agent = Agents(gamma = 0.99, lr = 0.001, batch_size=65, n_actions=env.action_space.n, input_dims=(4,84,84), epsilon=1, eps_dec=0.9999).to(device)
+target_res = dqn(env.observation_space.shape, env.action_space.n).to(device)
+
+# loop
+rewards_per_episode = []
+
+print("=====Starting=====")
+
+try:
+    for i in range(n_episodes+1):
+        rewards = 0
+        time = 0
+        terminated = False
+        tronc = False
+        observation = env.reset()[0]
+        steps = 0
+        nbr_lives = 5
+        while not terminated:
+            action = agent.choose_action(observation)
+            reward = 0
+            observation_neu, reward, terminated, _, info = env.step(action)
+            if nbr_lives > int(info["lives"]):
+                nbr_lives = int(info["lives"])
+                reward -= 1
+                if nbr_lives < 4:
+                    terminated = True
+            reward = np.clip(reward, a_min = -5, a_max = 5)
+            agent.memory.store_transition(observation,action,reward,observation_neu,terminated)
+            agent.learn(target_res,terminated)
+            observation  = observation_neu
+            rewards += reward
+            steps += 1
+            agent.epsilon = max(agent.epsilon * agent.eps_dec, agent.eps_min)
+
+        rewards_per_episode.append(rewards)
+        mean_rewards = np.mean(rewards_per_episode[len(rewards_per_episode)-100:])
+
+
+        # Update target weights
+        if i % 10 == 0:
+            target_res.load_state_dict(agent.Q_eval.state_dict())
+        if i % 100==0:
+            text = "./saves/save_w_checkpoint_"+str(0)+".pth"
+            torch.save(agent.Q_eval.state_dict(),"./"+text)
+            print(f'Episode: {i}, Rewards: {rewards},  Epsilon: {agent.epsilon:0.2f}, Mean Rewards: {mean_rewards:0.1f}')
+    env.close()
+    torch.save(agent.Q_eval.state_dict(), "./saves/save_w_break.pth")
+
+except KeyboardInterrupt:
+    env.close()
+    torch.save(agent.Q_eval.state_dict(), "save_w_interrupt.pth")
+    sys.exit()
+
