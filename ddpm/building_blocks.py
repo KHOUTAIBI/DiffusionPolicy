@@ -90,7 +90,7 @@ class DownBlock(nn.Module):
             output = output + attn_out
 
         down = self.down_sample_conv(output)
-        return down, output  # output is skip connection
+        return down  # output is skip connection
 
 
 # -------------------------------
