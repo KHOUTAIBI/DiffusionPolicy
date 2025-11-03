@@ -106,7 +106,7 @@ class MidBlock(nn.Module):
             [
                 nn.Sequential(
                     nn.GroupNorm(8, in_channels if i == 0 else out_channels),
-                    nn.SiLU(),
+                    nn.ReLU(),
                     nn.Conv2d(in_channels if i == 0 else out_channels, out_channels, kernel_size=3, stride=1,
                               padding=1),
                 )
@@ -115,7 +115,7 @@ class MidBlock(nn.Module):
         )
         self.t_emb_layers = nn.ModuleList([
             nn.Sequential(
-                nn.SiLU(),
+                nn.ReLU(),
                 nn.Linear(t_emb_dim, out_channels)
             )
             for _ in range(num_layers + 1)
@@ -124,7 +124,7 @@ class MidBlock(nn.Module):
             [
                 nn.Sequential(
                     nn.GroupNorm(8, out_channels),
-                    nn.SiLU(),
+                    nn.ReLU(),
                     nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1),
                 )
                 for _ in range(num_layers+1)
