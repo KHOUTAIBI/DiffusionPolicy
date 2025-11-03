@@ -1,4 +1,5 @@
 import json
+import yaml
 import tqdm
 import argparse
 import torch
@@ -19,16 +20,16 @@ def train(args):
     # Load config
     with open(args.config_path, 'r') as file:
         try:
-            config = json.load(file)
+            config = yaml.safe_load(file)
         except Exception as e:
             print(f'Error loading config: {e}')
             return None
     
     # Configuration of model
-    diffusion_config = config['diffusion_params']
-    dataset_config = config['dataset_params']
-    model_config = config['model_params']
-    train_config = config['train_params']
+    diffusion_config = config['diffusion_config']
+    dataset_config = config['dataset_config']
+    model_config = config['model_config']
+    train_config = config['train_config']
 
     # Dataset and DataLoader
     mnist_trainset = datasets.MNIST(

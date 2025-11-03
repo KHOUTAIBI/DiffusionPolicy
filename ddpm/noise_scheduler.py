@@ -23,25 +23,15 @@ class NoiseScheduler(nn.Module):
     # Adding noise to the image repeatedly
     def add_noise(self, original_image, noise, t):
         """
-        Add noise to an image, the original image is a batch of images
+        Add noise to an image batch according to the DDPM forward process.
         """
         
-        original_shape = original_image.shape
-        batch_size = original_image[0]
-        
-        # Batching the alpha_bar to be added to the whole( training batch
-        sqrt_alpha_bar = self.alpha_bar.to(self.device)[t].reshape(batch_size)
-        one_minus_alpha_bar = self.sqrt_one_minus_alpha_bar.to(self.device).reshape(batch_size)
-        
-        for i in range(len(original_shape) - 1):
-            sqrt_alpha_bar = sqrt_alpha_bar.unsqueeze(-1)
-            sqrt_alpha_bar = sqrt_alpha_bar.unsqueeze(-1)
-
-        # adding noise
-        noised_image = sqrt_alpha_bar * original_image + one_minus_alpha_bar * noise
-
-        return noised_image
+        t = t.to(self.device)
+        sqrt_alpha_bar = self.sqrt_alpha_bar.to(self.device)[t].view(-1, 1, 1, 1)
+        sqrt_one_minus_alpha_bar = self.sqrt_one_minus_alpha_bar.to(self.device)[t].view(-1, 1, 1, 1)
+        return sqrt_alpha_bar * original_image + sqrt_one_minus_alpha_bar * noise
     
+    # Reversing the process of noising
     def reverse_process(self, xt, noise_prediction, t, var_type : str = 'random_initialization'):
         """
         This function applies the denoising process as seen in page 4 of the DDPM paper.
@@ -72,15 +62,6 @@ class NoiseScheduler(nn.Module):
         # This here is exactly nu_tilde = nu + sigma * randn_noise, as seen in page 4 of the DDPM paper
         return mean + sigma * z, x0
 
-
-
-
-
-class Model(nn.Module):
-    def __init__(self, beta, alpha, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.beta = beta
-        self.alpha = alpha
 
 
 
