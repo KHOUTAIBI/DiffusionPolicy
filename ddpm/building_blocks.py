@@ -38,7 +38,7 @@ class DownBlock(nn.Module):
             nn.Sequential(
                 nn.GroupNorm(8, in_channels if i == 0 else out_channels),
                 nn.ReLU(),
-                nn.Conv2d(in_channels if i == 0 else out_channels, out_channels, 3, padding=1)
+                nn.Conv2d(in_channels if i == 0 else out_channels, out_channels, kernel_size = 3, padding=1)
             ) for i in range(num_layers)
         ])
 
@@ -53,7 +53,7 @@ class DownBlock(nn.Module):
             nn.Sequential(
                 nn.GroupNorm(8, out_channels),
                 nn.ReLU(),
-                nn.Conv2d(out_channels, out_channels, 3, padding=1)
+                nn.Conv2d(out_channels, out_channels, kernel_size = 3, padding=1)
             ) for _ in range(num_layers)
         ])
 
@@ -62,16 +62,17 @@ class DownBlock(nn.Module):
         ])
         self.attentions = nn.ModuleList([
             nn.MultiheadAttention(out_channels, num_heads, batch_first=True) for _ in range(num_layers)
-        ])
+        ]) # batch first always in Attention, remember the course on RNN
 
         self.residual_input_conv = nn.ModuleList([
             nn.Conv2d(in_channels if i == 0 else out_channels, out_channels, 1)
             for i in range(num_layers)
         ])
 
-        self.down_sample_conv = nn.Conv2d(out_channels, out_channels, 4, 2, 1) if down_sample else nn.Identity()
+        self.down_sample_conv = nn.Conv2d(out_channels, out_channels, kernel_size=4, stride=2, padding=1) if down_sample else nn.Identity()
 
     def forward(self, x, embedding):
+        
         output = x
 
         for i in range(self.num_layers):
@@ -90,7 +91,7 @@ class DownBlock(nn.Module):
             output = output + attn_out
 
         down = self.down_sample_conv(output)
-        return down  # output is skip connection
+        return down # output is skip connection
 
 
 # -------------------------------
@@ -105,7 +106,7 @@ class MidBlock(nn.Module):
             nn.Sequential(
                 nn.GroupNorm(8, in_channels if i == 0 else out_channels),
                 nn.ReLU(),
-                nn.Conv2d(in_channels if i == 0 else out_channels, out_channels, 3, 1, 1)
+                nn.Conv2d(in_channels if i == 0 else out_channels, out_channels, kernel_size=3, stride=1, padding=1)
             ) for i in range(num_layers + 1)
         ])
 
@@ -118,7 +119,7 @@ class MidBlock(nn.Module):
             nn.Sequential(
                 nn.GroupNorm(8, out_channels),
                 nn.ReLU(),
-                nn.Conv2d(out_channels, out_channels, 3, 1, 1)
+                nn.Conv2d(out_channels, out_channels, kernel_size = 3, stride = 1, padding = 1)
             ) for _ in range(num_layers + 1)
         ])
 
@@ -131,13 +132,13 @@ class MidBlock(nn.Module):
         ])
 
         self.residual_input_conv = nn.ModuleList([
-            nn.Conv2d(in_channels if i == 0 else out_channels, out_channels, 1)
+            nn.Conv2d(in_channels if i == 0 else out_channels, out_channels, kernel_size = 1)
             for i in range(num_layers + 1)
         ])
 
     def forward(self, x, t_emb):
+        
         out = x
-
         # First block
         unet_input = out
         out = self.unet_conv_first[0](out)
@@ -145,8 +146,9 @@ class MidBlock(nn.Module):
         out = self.unet_conv_second[0](out)
         out = out + self.residual_input_conv[0](unet_input)
 
-        # Attention + more convs
+        # Attention + more convs / Can also use the Conv1 !
         for i in range(self.num_layers):
+
             attn_input = self.attention_norms[i](out)
             B, C, H, W = attn_input.shape
             attn_input = attn_input.view(B, C, H * W).transpose(1, 2)
@@ -168,20 +170,23 @@ class MidBlock(nn.Module):
 # -------------------------------
 class UpBlock(nn.Module):
     def __init__(self, in_channels, out_channels, t_emb_dim, up_sample=True, num_heads=4, num_layers=1):
+        
         super().__init__()
+
         self.num_layers = num_layers
         self.up_sample = up_sample
 
-        self.up_sample_conv = nn.ConvTranspose2d(in_channels, in_channels, 4, 2, 1) if up_sample else nn.Identity()
+        self.up_sample_conv = nn.ConvTranspose2d(in_channels // 2, in_channels // 2 , kernel_size=4, stride=2, padding=1) if up_sample else nn.Identity() # this is to verofy ? kernel = 4 ?
 
         self.unet_conv_first = nn.ModuleList([
             nn.Sequential(
                 nn.GroupNorm(8, in_channels if i == 0 else out_channels),
                 nn.SiLU(),
-                nn.Conv2d(in_channels if i == 0 else out_channels, out_channels, 3, 1, 1)
+                nn.Conv2d(in_channels if i == 0 else out_channels, out_channels, kernel_size=3, stride=1, padding=1)
             ) for i in range(num_layers)
         ])
 
+        # Embedding layer
         self.t_emb_layers = nn.ModuleList([
             nn.Sequential(nn.SiLU(), nn.Linear(t_emb_dim, out_channels))
             for _ in range(num_layers)
@@ -190,8 +195,8 @@ class UpBlock(nn.Module):
         self.unet_conv_second = nn.ModuleList([
             nn.Sequential(
                 nn.GroupNorm(8, out_channels),
-                nn.SiLU(),
-                nn.Conv2d(out_channels, out_channels, 3, 1, 1)
+                nn.SiLU(),  
+                nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
             ) for _ in range(num_layers)
         ])
 
@@ -209,9 +214,11 @@ class UpBlock(nn.Module):
         ])
 
     def forward(self, x, skip, t_emb):
+        # print(x.shape)
         x = self.up_sample_conv(x)
+        # print(x.shape, skip.shape)
         x = torch.cat([x, skip], dim=1)
-
+        
         out = x
         for i in range(self.num_layers):
             unet_input = out

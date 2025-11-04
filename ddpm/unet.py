@@ -72,10 +72,10 @@ class Unet(nn.Module):
 
         # up blocks: iterate reversed indexes of down blocks (as in your original)
         self.ups = nn.ModuleList()
-        # when i==0 we want out_channels to be self.down_channels[0] (no magic '16')
+        # when i==0 we want out_channels to be self.down_channels[0] 
         for i in reversed(range(len(self.down_channels) - 1)):
+            in_ch = self.down_channels[i] * 2   # because x will be concatenated with skip
             out_ch = self.down_channels[i - 1] if i > 0 else self.down_channels[0]
-            in_ch = self.down_channels[i] * 2  # because x will be concatenated with skip
             self.ups.append(
                 UpBlock(
                     in_channels=in_ch,
@@ -109,10 +109,11 @@ class Unet(nn.Module):
 
         # store skip connections (store *before* applying the down block)
         down_outs = []
+    
         for down in self.downs:
-            down_outs.append(out)          # skip for corresponding up block
+            down_outs.append(out)             # skip for corresponding up block
             out = down(out, t_emb)         # expects DownBlock to return the downsampled feature
-
+        
         # middle blocks
         for mid in self.mids:
             out = mid(out, t_emb)

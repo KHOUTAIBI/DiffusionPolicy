@@ -438,3 +438,5 @@ __marimo__/
 # Pytorch and Data
 data/
 yaml
+saves/
+samples/
