@@ -122,8 +122,9 @@ def sample(model, scheduler, training_config, model_config, diffusion_config):
         grid = make_grid(ims, nrow=training_config['num_grid_rows'])
         img = torchvision.transforms.ToPILImage()(grid)
 
-        img.save(f'./samples/sample_{i}.png')
-        img.close()
+        if i % 100 == 0:
+            img.save(f'./samples/sample_{i}.png')
+            img.close()
 
 # -------------------------------
 # Inference
