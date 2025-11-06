@@ -1,6 +1,10 @@
 from building_blocks import *
 from noise_scheduler import *
 
+
+# -------------------------------
+# Unet Architecture 
+# -------------------------------   
 class Unet(nn.Module):
     """
     U-Net for DDPM. Expects building blocks (DownBlock, MidBlock, UpBlock, time_embedding)
@@ -132,6 +136,11 @@ class Unet(nn.Module):
         out = self.conv_out(out)
         return out
 
+
+#
+# -------------------------------
+# Diffusion Policy Class, Here we sample and we predict actions
+# -------------------------------   
 class Policy(nn.Module):
 
     def __init__(self, model, model_config, *args, **kwargs) -> None:

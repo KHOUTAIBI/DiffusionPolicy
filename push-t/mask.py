@@ -1,6 +1,10 @@
 import torch
 import torch.nn as nn
 
+
+# -------------------------------
+# Mask for Conditioning on observation 
+# -------------------------------   
 class Mask(nn.Module):
     
     def __init__(self,
