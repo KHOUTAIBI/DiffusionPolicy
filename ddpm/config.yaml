@@ -8,7 +8,7 @@ diffusion_config:
 
 
 model_config:
-  save_path : './saves/ddpm_chkpt_2.pth'
+  save_path : './saves/ddpm_chkpt_19.pth'
   im_channels : 1
   im_size : 28
   down_channels : [32, 64, 128, 256]
@@ -23,8 +23,8 @@ model_config:
 train_config:
   task_name: 'default'
   batch_size: 64
-  num_epochs: 20
+  num_epochs: 40
   num_samples : 100
   num_grid_rows : 10
   lr: 0.0001
-  ckpt_name: 'ddpm_ckpt.pth'
+  ckpt_name: 'ddpm_ckpt_19.pth'

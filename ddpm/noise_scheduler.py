@@ -37,13 +37,13 @@ class NoiseScheduler(nn.Module):
         This function applies the denoising process as seen in page 4 of the DDPM paper.
         """
         
-        assert var_type == 'random_initialization' or 'deterministic_initialization' 
+        assert var_type in ['random_initialization', 'deterministic_initialization']
         
         x0 = (xt - self.sqrt_one_minus_alpha_bar.to(self.device)[t] * noise_prediction) / self.sqrt_alpha_bar[t] # see paper for x_t -> x0 !
         x0 = torch.clamp(x0, -1., 1.) # this is to be verified ?
 
         # Calculating the mean found in page 4 of the DDPM paper
-        mean =  xt - self.betas[t] / self.sqrt_one_minus_alpha_bar[t] 
+        mean =  xt - (self.betas[t] * noise_prediction / self.sqrt_one_minus_alpha_bar[t]) 
         mean /= torch.sqrt(self.alphas[t])
         
         if t == 0:
@@ -57,8 +57,8 @@ class NoiseScheduler(nn.Module):
             variance /= 1 - self.alpha_bar[t]  
 
         sigma = torch.sqrt(variance)
-        z = torch.randn(size = xt.shape).to(self.device)
-
+        z = torch.randn_like(xt).to(self.device)
+        
         # This here is exactly nu_tilde = nu + sigma * randn_noise, as seen in page 4 of the DDPM paper
         return mean + sigma * z, x0
 

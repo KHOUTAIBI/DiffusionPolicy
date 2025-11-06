@@ -113,7 +113,7 @@ def sample(model, scheduler, training_config, model_config, diffusion_config):
         noise_prediciton = model(xt, torch.as_tensor(i).unsqueeze(0).to(device)) # I unsqueezed here to add new axis in dim = 0 (i.e the very first element)
 
         # scheduling
-        xt, x0 = scheduler.reverse_process(xt, noise_prediciton, torch.as_tensor(i).to(device))
+        xt, _ = scheduler.reverse_process(xt, noise_prediciton, torch.as_tensor(i).to(device))
         
         # Image sampled
         ims = torch.clamp(xt, -1., 1.).detach().cpu()
@@ -142,7 +142,7 @@ def infer(args):
     diffusion_config = config['diffusion_config']
     model_config = config['model_config']
     train_config = config['train_config']
-
+    print(model_config['save_path'])
     # Loading model
     model = Unet(model_config).to(device)
     model.load_state_dict(torch.load(model_config['save_path']))
