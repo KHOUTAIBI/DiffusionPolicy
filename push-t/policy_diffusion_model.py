@@ -1,5 +1,6 @@
 from building_blocks import *
 from noise_scheduler import *
+from mask import *
 
 
 # -------------------------------
@@ -34,6 +35,10 @@ class Unet(nn.Module):
         self.action_dim = model_config['action_dim']
         self.n_action_steps = model_config['n_action_steps']
         self.n_obs_steps = model_config['n_obs-steps']
+        self.num_timesteps = model_config['num_timesteps']
+        self.mask_generator = Mask(
+            self.obs_dim, self.action_dim
+        )
 
         # basic sanity checks (keep as you had them)
         assert self.mid_channels[0] == self.down_channels[-1], "mid[0] must equal down[-1]"
@@ -146,6 +151,8 @@ class Policy(nn.Module):
     def __init__(self, model, model_config, *args, **kwargs) -> None:
         
         super().__init__(*args, **kwargs)
+
+        self.model_config = model_config
         self.model = model
         self.scheduler = NoiseScheduler(num_timesteps=model_config['num_timesteps'], 
                                         beta_init=model_config['beta_init'], 
@@ -177,9 +184,102 @@ class Policy(nn.Module):
         # Returning path
         return path 
     
-    def predict_action():
-        pass
+    def predict_action(self, obs_dict : dict):
+        """
+        Take an bservation disctionnary and return a DICT of actions
+        """
 
+        assert 'obs' in obs_dict
+        
+        nobs = obs_dict['obs']
+        B, _, Do = nobs.shape 
+        To = self.model.n_obs_steps
+
+        assert Do == self.model.obs_dim # Dimension of observations
+        T = self.model.horizon
+        Da = self.model.action_dim # Dimension of action
+
+        device = self.model.device
+
+        # Getting the conditioning mask
+        shape = (B, T, Da+Do)
+        cond_data = torch.zeros(size=shape, device=device)
+        cond_mask = torch.zeros_like(cond_data, dtype=torch.bool)
+        cond_data[:,:To,Da:] = nobs[:,:To]
+        cond_mask[:,:To,Da:] = True
+
+        # sampling
+        nsamples = self.conditional_sampling(
+            cond_data,
+            cond_mask
+        )
+
+        naction_pred = nsamples[...,:Da] # Taking all elements of all dims except the last one where We slice
+
+        # Getting action
+        if self.pred_action_steps_only:
+            action = naction_pred
+        else:
+            start = To
+            if self.oa_step_convention:
+                start = To - 1
+            end = start + self.n_action_steps
+            action = naction_pred[:,start:end]
+        
+        result = {
+            'action': action,
+            'action_pred': naction_pred
+        }
+
+        # returning result
+        return result
+    
+    # here we compute the loss of predicting the noise
+    def compute_loss(self, batch):
+        
+        obs = batch['obs']
+        action = batch['action']
+
+        # compute path
+        trajectory = torch.cat((obs, action), dim = -1)
+
+        # Compute mask
+        if self.model.pred_action_steps_only:
+            condition_mask = torch.zeros_like(trajectory, dtype=torch.bool)
+        else:
+            condition_mask = self.model.mask_generator(trajectory.shape)
+
+        # noise samping
+        noise = torch.rand_like(trajectory)
+
+        timesteps = torch.randint(
+            0, self.model.num_timesteps, 
+            (trajectory.shape[0],), device=trajectory.device
+        )
+
+        noisy_trajectory = self.scheduler.add_noise(trajectory, noise, timesteps)
+
+        # Mask
+        loss_mask = ~condition_mask
+        noisy_trajectory[condition_mask] = trajectory[condition_mask]
+
+        # prediction
+        prediction = self.model(noisy_trajectory, timesteps)
+
+        target = trajectory
+
+        # Calculating the loss which is the MSE between prediction and original target 
+        loss = F.mse_loss(prediction, target)
+        loss *= loss_mask
+
+        loss = torch.mean(loss)
+        
+        return loss
+
+
+
+
+ 
 
 
 
