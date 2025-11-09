@@ -16,15 +16,15 @@ class PushTStateDataset(torch.utils.data.Dataset):
             # (N, action_dim)
             'action': dataset_root['data']['action'][:], # type : ignore # type: ignore
             # (N, obs_dim)
-            'obs': dataset_root['data']['state'][:]  # type : ignore
+            'obs': dataset_root['data']['state'][:]  # type : ignore # type: ignore
         }
         # Marks one-past the last index for each episode
-        episode_ends = dataset_root['meta']['episode_ends'][:] # type : ignore
+        episode_ends = dataset_root['meta']['episode_ends'][:] # type: ignore # type : ignore
 
         # compute start and end of each state-action sequence
         # also handles padding
         indices = create_sample_indices(
-            episode_ends=episode_ends, # type : ignore
+            episode_ends=episode_ends, # type : ignore # type: ignore
             sequence_length=pred_horizon,
             # add padding such that each timestep in the dataset are seen
             pad_before=obs_horizon-1,
@@ -69,7 +69,8 @@ class PushTStateDataset(torch.utils.data.Dataset):
 
 
 def get_data_stats(data):
-    data = data.reshape(-1,data.shape[-1])
+    
+    data = data.reshape(-1, data.shape[-1])
     stats = {
         'min': np.min(data, axis=0),
         'max': np.max(data, axis=0)
@@ -125,8 +126,18 @@ def sample_sequence(train_data, sequence_length,
     return result
 
 def normalize_data(data, stats):
-    
+    """
+    Normalize the data
+    """
     ndata = (data - stats['min']) / (stats['max'] - stats['min'])
     ndata = 2 * ndata - 1
 
     return ndata
+
+def unnormalize_data(ndata, stats):
+    """
+    Unormalize the data
+    """
+    ndata = (ndata + 1) / 2
+    data = ndata * (stats['max'] - stats['min']) + stats['min']
+    return data

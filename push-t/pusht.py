@@ -6,11 +6,8 @@ from policy_diffusion_model import *
 from datasets import load_dataset
 import gymnasium as gym
 from dataset import *
+from transformers import get_scheduler
 import os
-
-
-
-from datasets import load_dataset
 
 # Login using e.g. `huggingface-cli login` to access this dataset
 def collate_fn(batch):
@@ -33,6 +30,7 @@ def train(args):
     pred_horizon = 16
     action_horizon = 8
     num_epochs = 100
+    
 
     #|o|o|                             observations: 2
     #| |a|a|a|a|a|a|a|a|               actions executed: 8
@@ -71,7 +69,13 @@ def train(args):
     )
 
     # optimizer
-    optimzer = Adam(noise_prediction_model.parameters(), lr=1e-3, weight_decay=1e-6)
+    optimizer = Adam(noise_prediction_model.parameters(), lr=1e-3, weight_decay=1e-6) 
+    lr_scheduler = get_scheduler(
+        name='cosine',
+        optimizer=optimizer,
+        num_warmup_steps=500,
+        num_training_steps=len(dataloader) * num_epochs
+    )
     
     with tqdm.tqdm(range(num_epochs), desc='Epoch') as tglobal:
         
@@ -85,6 +89,8 @@ def train(args):
                 for nbatch in tepoch:
                     # data normalized in dataset
                     # device transfer
+                    
+                    optimizer.zero_grad()
                     nobs = nbatch['obs'].to(device)
                     naction = nbatch['action'].to(device)
 
@@ -92,7 +98,7 @@ def train(args):
                     
                     obs_cond = nobs[:, observation_horizon:, :]
                     obs_cond = nobs.flatten(start_dim = 1)
-                    print(obs_cond.shape)
+                    
                     
                     # This needs to get fixed
                     
@@ -119,8 +125,8 @@ def train(args):
 
                     # optimize
                     loss.backward()
-                    optimzer.step()
-                    optimzer.zero_grad()
+                    optimizer.step()
+                    lr_scheduler.step()
 
                     # logging
                     loss_cpu = loss.item()
@@ -128,8 +134,10 @@ def train(args):
                     tepoch.set_postfix(loss=loss_cpu)
             tglobal.set_postfix(loss=np.mean(epoch_loss))
 
-        print(f"Finished epoch {epoch_idx+1}/{num_epochs} | Loss: {np.mean(epoch_loss):.4f}")
-        torch.save(noise_prediction_model.state_dict(), f'./saves/ddpm_chkpt_{epoch_idx}.pth')
+            if (epoch_idx + 1) % 10 == 0:
+                print(f"Finished epoch {epoch_idx+1}/{num_epochs} | Loss: {np.mean(epoch_loss):.4f}")
+                torch.save(noise_prediction_model.state_dict(), f'./saves/pusht_chkpt_{epoch_idx + 1}.pth')
+        
         print("Finished training!")
 
 

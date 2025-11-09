@@ -124,7 +124,7 @@ class ConditionalUnet1D(nn.Module):
 
         # BLOCKS OF UNET
         in_out = list(zip(self.all_dims[:-1], self.all_dims[1:]))
-        print(in_out)
+       
         
 
         mid_dim = self.all_dims[-1]
@@ -141,7 +141,7 @@ class ConditionalUnet1D(nn.Module):
             ),
         ]).to(self.device)
 
-        down_modules = []
+        down_modules = nn.ModuleList([])
 
         # DOWN LAYER
         for ind, (dim_in, dim_out) in enumerate(in_out):
@@ -158,7 +158,7 @@ class ConditionalUnet1D(nn.Module):
             ]).to(self.device))
 
         # up module of unet
-        up_modules = []
+        up_modules = nn.ModuleList([])
 
         # UP BLOCK OF UNET
         for ind, (dim_in, dim_out) in enumerate(reversed(in_out)):
@@ -196,6 +196,13 @@ class ConditionalUnet1D(nn.Module):
             sample = sample.moveaxis(-1,-2)
            
             # time_embedding = timesteps.expand(sample.shape[0])
+            
+            if not torch.is_tensor(timesteps):
+                timesteps = torch.tensor([timesteps], device=sample.device)
+            
+            elif torch.is_tensor(timesteps) and len(timesteps.shape) == 0:
+                timesteps = timesteps[None].to(sample.device)
+            
             timesteps = timesteps.expand(sample.shape[0])
             gloabal_features = self.time_embedding(timesteps)
             
