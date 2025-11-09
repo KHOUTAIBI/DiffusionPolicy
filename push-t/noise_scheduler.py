@@ -27,8 +27,9 @@ class NoiseScheduler(nn.Module):
         """
         
         t = t.to(self.device)
-        sqrt_alpha_bar = self.sqrt_alpha_bar.to(self.device)[t].view(-1, 1, 1, 1)
-        sqrt_one_minus_alpha_bar = self.sqrt_one_minus_alpha_bar.to(self.device)[t].view(-1, 1, 1, 1)
+        sqrt_alpha_bar = self.sqrt_alpha_bar.to(self.device)[t].view(-1, 1, 1)
+        sqrt_one_minus_alpha_bar = self.sqrt_one_minus_alpha_bar.to(self.device)[t].view(-1, 1, 1)
+        # print(sqrt_alpha_bar.shape, sqrt_one_minus_alpha_bar.shape, original_image.shape, noise.shape)
         return sqrt_alpha_bar * original_image + sqrt_one_minus_alpha_bar * noise
     
     # Reversing the process of noising

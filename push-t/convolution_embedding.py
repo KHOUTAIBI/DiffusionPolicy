@@ -12,9 +12,9 @@ class Convolution1D(nn.Module):
 
         super().__init__(*args, **kwargs)  
         self.convolution = nn.Sequential(
-            nn.Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size = kernel_size, stride = stride, padding = padding),
+            nn.Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size = kernel_size, stride = stride, padding = kernel_size // 2),
             # Group norming
-            nn.GroupNorm(num_groups=norm_group, num_channels=in_channels),
+            nn.GroupNorm(num_groups=norm_group, num_channels=out_channels),
             # Surprisignly used in a lot of recent papers
             nn.Mish(),
         )
@@ -24,6 +24,7 @@ class Convolution1D(nn.Module):
         The convolution block, which is the building block of Unet 
         """
         # Foearding the x
+        
         return self.convolution(x)
 
 

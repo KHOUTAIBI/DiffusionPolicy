@@ -9,7 +9,7 @@ diffusion_config:
 
 model_config:
   save_path : './saves/ddpm_chkpt_19.pth'
-  im_channels : 1
+  im_channels : 16
   im_size : 28
   down_channels : [32, 64, 128, 256]
   mid_channels : [256, 256, 128]
@@ -19,6 +19,14 @@ model_config:
   num_mid_layers : 2
   num_up_layers : 2
   num_heads : 4
+  horizon : 2
+  obs_dim : 5
+  action_dim : 2
+  n_action_steps : 2
+  n_obs-steps : 2 
+  num_timesteps : 100
+  beta_init : 0.0001
+  beta_end : 0.02
 
 train_config:
   task_name: 'default'

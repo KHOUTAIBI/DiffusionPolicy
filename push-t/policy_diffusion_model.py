@@ -102,7 +102,7 @@ class Unet(nn.Module):
         # output layers: use the first down channel as the final feature dimension
         final_ch = self.down_channels[0]
         self.norm_out = nn.GroupNorm(8, final_ch)
-        self.conv_out = Convolution1D(final_ch, im_channels, kernel_size=3, padding=1)
+        self.conv_out = Convolution1D(final_ch, im_channels, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x, t):
         """

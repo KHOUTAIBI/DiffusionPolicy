@@ -1,36 +1,141 @@
-import json
 import yaml
 import tqdm
 import argparse
-import torch
-import torchvision
-import torch.nn as nn
-import numpy as np
-from noise_scheduler import NoiseScheduler
-from torch.utils.data import DataLoader
-import torchvision.datasets as datasets
-import torchvision.transforms as transforms
 from torch.optim import Adam
+from policy_diffusion_model import *
+from datasets import load_dataset
 import gymnasium as gym
-import gym_pusht
+from dataset import *
+import os
 
 
-env = gym.make("gym_pusht/PushT-v0", render_mode = 'human')
-observation, info = env.reset()
 
-for _ in range(1000):
-    action = env.action_space.sample()
-    observation, reward, terminated, truncated, info = env.step(action)
-    image = env.render()
-    print(observation)
-    if terminated or truncated:
-        observation, info = env.reset()
+from datasets import load_dataset
 
-env.close()
+# Login using e.g. `huggingface-cli login` to access this dataset
+def collate_fn(batch):
+    # batch is a list of dicts
+    obs = torch.tensor([b['observation_state'] for b in batch], dtype=torch.float32)
+    act = torch.tensor([b['action'] for b in batch], dtype=torch.float32)
+    return {'observation_state': obs, 'action': act}
+
+# -------------------------------
+# Train Using the push-t dataset
+# -------------------------------
+def train(args):
+    
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    # Horizons and variables
+    observation_dim = 5
+    observation_horizon = 2
+    action_dim = 2
+    pred_horizon = 16
+    action_horizon = 8
+    num_epochs = 100
+
+    #|o|o|                             observations: 2
+    #| |a|a|a|a|a|a|a|a|               actions executed: 8
+    #|p|p|p|p|p|p|p|p|p|p|p|p|p|p|p|p| actions predicted: 16
+
+    noise_prediction_model = ConditionalUnet1D(
+        input_dim = action_dim,
+        global_cond_dim = observation_dim * observation_horizon,
+        n_groups = 2
+    )
+
+    noise_scheduler = NoiseScheduler(num_timesteps=100, beta_init=0.0001, beta_end=0.02)    
+
+    # Login using e.g. `huggingface-cli login` to access this dataset
+    dataset_path = "pusht_cchi_v7_replay.zarr.zip"
+
+    
+    dataset = PushTStateDataset(
+        dataset_path=dataset_path,
+        pred_horizon=pred_horizon,
+        obs_horizon=observation_horizon,
+        action_horizon=action_horizon
+    )
+
+    stats = dataset.stats
+  
+    dataloader = torch.utils.data.DataLoader(
+        dataset, #type: ignore  
+        batch_size=256,
+        num_workers=1,
+        shuffle=True,
+        # accelerate cpu-gpu transfer
+        pin_memory=True,
+        # don't kill worker process afte each epoch
+        persistent_workers=True
+    )
+
+    # optimizer
+    optimzer = Adam(noise_prediction_model.parameters(), lr=1e-3, weight_decay=1e-6)
+    
+    with tqdm.tqdm(range(num_epochs), desc='Epoch') as tglobal:
+        
+        for epoch_idx in tglobal:
+        
+            epoch_loss = list()
+            # batch loop
+            
+            with tqdm.tqdm(dataloader, desc='Batch', leave=False) as tepoch:
+                
+                for nbatch in tepoch:
+                    # data normalized in dataset
+                    # device transfer
+                    nobs = nbatch['obs'].to(device)
+                    naction = nbatch['action'].to(device)
+
+                    B = nobs.shape[0] # batch, size of trianing samples
+                    
+                    obs_cond = nobs[:, observation_horizon:, :]
+                    obs_cond = nobs.flatten(start_dim = 1)
+                    print(obs_cond.shape)
+                    
+                    # This needs to get fixed
+                    
+                    # sample noise to add to actions
+                    noise = torch.randn(naction.shape, device=device)
+
+                    # sample a diffusion iteration for each data point
+                    timesteps = torch.randint(
+                        0, noise_scheduler.num_timesteps,
+                        (B, ), device=device
+                    )
+
+                    # add noise to the clean images according to the noise magnitude at each diffusion iteration
+                    # (this is the forward diffusion process)
+                    
+                    noisy_actions = noise_scheduler.add_noise(
+                        naction, noise, timesteps)
+                    # predict the noise residual
+                    noise_pred = noise_prediction_model(
+                        noisy_actions, timesteps, global_cond=obs_cond)
+
+                    # L2 loss
+                    loss = nn.functional.mse_loss(noise_pred, noise)
+
+                    # optimize
+                    loss.backward()
+                    optimzer.step()
+                    optimzer.zero_grad()
+
+                    # logging
+                    loss_cpu = loss.item()
+                    epoch_loss.append(loss_cpu)
+                    tepoch.set_postfix(loss=loss_cpu)
+            tglobal.set_postfix(loss=np.mean(epoch_loss))
+
+        print(f"Finished epoch {epoch_idx+1}/{num_epochs} | Loss: {np.mean(epoch_loss):.4f}")
+        torch.save(noise_prediction_model.state_dict(), f'./saves/ddpm_chkpt_{epoch_idx}.pth')
+        print("Finished training!")
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Arguments for DDPM training')
     parser.add_argument('--config', dest='config_path', default='./config.yaml', type=str)
     args = parser.parse_args()
+    train(args)
     
