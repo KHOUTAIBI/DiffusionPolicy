@@ -4,19 +4,26 @@ import torch.nn as nn
 import scipy as sp
 
 class NoiseScheduler(nn.Module):
-    def __init__(self, num_timesteps, beta_init, beta_end, device = 'cuda', *args, **kwargs) -> None:
+    def __init__(self, num_timesteps, beta_init = 0.0001, beta_end = 0.02, device = 'cuda', *args, **kwargs) -> None:
         
         super().__init__(*args, **kwargs)
 
         # Timesteps and betas 
         self.device = device
         self.num_timesteps = num_timesteps
-        self.beta_init = beta_init
-        self.beta_end = beta_end
+        self.s = 0.008
 
-        self.betas = torch.linspace(beta_init, beta_end, num_timesteps) # the batas used in the schedule shall be linearly increasing, can be changed !
-        self.alphas = 1 - self.betas # alphas used in scheduler
-        self.alpha_bar = torch.cumprod(self.alphas, dim = 0) # alpha_bar_t = product of all alpha_s s <= t 
+        # t ∈ [0, num_timesteps]
+        self.t = torch.linspace(0, num_timesteps, num_timesteps + 1, device=self.device)
+        f = torch.cos(((self.t / num_timesteps + self.s) / (1 + self.s)) * np.pi / 2) ** 2
+        alpha_bar = f / f[0]  # normalized to start at 1
+
+        # beta_t = 1 - (alpha_bar_t / alpha_bar_{t-1})
+        self.alpha_bar = alpha_bar
+        self.betas = 1 - (self.alpha_bar / self.alpha_bar)
+        self.betas = torch.clamp(self.betas, 0.0001, 0.9999)
+        
+        self.alphas = 1.0 - self.betas
         self.sqrt_alpha_bar = torch.sqrt(self.alpha_bar)
         self.sqrt_one_minus_alpha_bar = torch.sqrt(1 - self.alpha_bar)
 

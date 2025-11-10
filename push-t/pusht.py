@@ -6,7 +6,8 @@ from policy_diffusion_model import *
 from datasets import load_dataset
 import gymnasium as gym
 from dataset import *
-from transformers import get_scheduler
+from diffusers.optimization import get_scheduler
+from diffusers.training_utils import EMAModel
 import os
 
 # Login using e.g. `huggingface-cli login` to access this dataset
@@ -41,6 +42,7 @@ def train(args):
         global_cond_dim = observation_dim * observation_horizon,
         n_groups = 2
     )
+    ema = EMAModel(model=noise_prediction_model, power=0.75)
 
     noise_scheduler = NoiseScheduler(num_timesteps=100, beta_init=0.0001, beta_end=0.02)    
 
@@ -69,7 +71,7 @@ def train(args):
     )
 
     # optimizer
-    optimizer = Adam(noise_prediction_model.parameters(), lr=1e-3, weight_decay=1e-6) 
+    optimizer = Adam(noise_prediction_model.parameters(), lr=1e-4, weight_decay=1e-6) 
     lr_scheduler = get_scheduler(
         name='cosine',
         optimizer=optimizer,
@@ -127,6 +129,7 @@ def train(args):
                     loss.backward()
                     optimizer.step()
                     lr_scheduler.step()
+                    ema.step(noise_prediction_model)
 
                     # logging
                     loss_cpu = loss.item()
@@ -137,6 +140,7 @@ def train(args):
             if (epoch_idx + 1) % 10 == 0:
                 print(f"Finished epoch {epoch_idx+1}/{num_epochs} | Loss: {np.mean(epoch_loss):.4f}")
                 torch.save(noise_prediction_model.state_dict(), f'./saves/pusht_chkpt_{epoch_idx + 1}.pth')
+                torch.save(ema.state_dict(), f'./saves/ema_chkpt_{epoch_idx + 1}.pth')
         
         print("Finished training!")
 

@@ -7,6 +7,7 @@ import gym_pusht
 from dataset import *
 from noise_scheduler import * 
 from skvideo.io import vwrite 
+from diffusers.training_utils import EMAModel
 import argparse
 
 
@@ -44,8 +45,9 @@ def infer(args):
     
     # Loading state model
     denoising_model = ConditionalUnet1D(input_dim=action_dim, global_cond_dim=action_dim * observation_dim, n_groups=2)
-    denoising_model.load_state_dict(torch.load("./saves/pusht_chkpt_60.pth"))
+    denoising_model.load_state_dict(torch.load("./saves/pusht_chkpt_80.pth"))
     denoising_model.eval()
+    ema = EMAModel(model=denoising_model, power=0.75)
 
     # Rewards and states
     observation, info = env.reset()
