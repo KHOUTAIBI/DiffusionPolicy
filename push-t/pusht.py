@@ -1,9 +1,8 @@
 import yaml
 import tqdm
 import argparse
-from torch.optim import Adam
+from torch.optim import AdamW
 from policy_diffusion_model import *
-from datasets import load_dataset
 import gymnasium as gym
 from dataset import *
 from diffusers.optimization import get_scheduler
@@ -41,10 +40,10 @@ def train(args):
         input_dim = action_dim,
         global_cond_dim = observation_dim * observation_horizon,
         n_groups = 2
-    )
-    ema = EMAModel(model=noise_prediction_model, power=0.75)
+    ).to(device)
+    ema = EMAModel(parameters=noise_prediction_model.parameters(), power=0.75)
 
-    noise_scheduler = NoiseScheduler(num_timesteps=100, beta_init=0.0001, beta_end=0.02)    
+    noise_scheduler = NoiseScheduler(num_timesteps=100).to(device)    
 
     # Login using e.g. `huggingface-cli login` to access this dataset
     dataset_path = "pusht_cchi_v7_replay.zarr.zip"
@@ -57,8 +56,6 @@ def train(args):
         action_horizon=action_horizon
     )
 
-    stats = dataset.stats
-  
     dataloader = torch.utils.data.DataLoader(
         dataset, #type: ignore  
         batch_size=256,
@@ -71,13 +68,17 @@ def train(args):
     )
 
     # optimizer
-    optimizer = Adam(noise_prediction_model.parameters(), lr=1e-4, weight_decay=1e-6) 
+    optimizer = AdamW(noise_prediction_model.parameters(), lr=1e-4, weight_decay=1e-6) 
     lr_scheduler = get_scheduler(
         name='cosine',
         optimizer=optimizer,
         num_warmup_steps=500,
         num_training_steps=len(dataloader) * num_epochs
     )
+
+    print("----------------------------------")
+    print(f"Staring to train")
+    print("----------------------------------")
     
     with tqdm.tqdm(range(num_epochs), desc='Epoch') as tglobal:
         
@@ -98,7 +99,7 @@ def train(args):
 
                     B = nobs.shape[0] # batch, size of trianing samples
                     
-                    obs_cond = nobs[:, observation_horizon:, :]
+                    obs_cond = nobs[:, :observation_horizon, :]
                     obs_cond = nobs.flatten(start_dim = 1)
                     
                     
@@ -129,12 +130,13 @@ def train(args):
                     loss.backward()
                     optimizer.step()
                     lr_scheduler.step()
-                    ema.step(noise_prediction_model)
+                    ema.step(noise_prediction_model.parameters())
 
                     # logging
                     loss_cpu = loss.item()
                     epoch_loss.append(loss_cpu)
                     tepoch.set_postfix(loss=loss_cpu)
+                    
             tglobal.set_postfix(loss=np.mean(epoch_loss))
 
             if (epoch_idx + 1) % 10 == 0:

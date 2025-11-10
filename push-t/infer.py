@@ -9,123 +9,116 @@ from noise_scheduler import *
 from skvideo.io import vwrite 
 from diffusers.training_utils import EMAModel
 import argparse
-
+import numpy as np
+import gdown
+import os
 
 def infer(args):
     """
-    Infer the results
+    Inference for the PushT DDPM policy
     """
-    
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    env = gym.make("gym_pusht/PushT-v0", render_mode = "rgb_array")
-    observation, info = env.reset()
     
-    # Horizons and variables
+    env = gym.make("gym_pusht/PushT-v0", render_mode="rgb_array")
+    env.action_space.seed(100000)
+    observation, _ = env.reset()
+
+    # use a seed >200 to avoid initial states seen in the training dataset
+
+    # Horizons
     num_timesteps = 100
     observation_dim = 5
     observation_horizon = 2
     action_dim = 2
     pred_horizon = 16
     action_horizon = 8
-    
 
-    # Getting dataset
+    # Dataset + stats
     dataset_path = "pusht_cchi_v7_replay.zarr.zip"
-
-    
     dataset = PushTStateDataset(
         dataset_path=dataset_path,
         pred_horizon=pred_horizon,
-        obs_horizon=observation_horizon,
+        obs_horizon=observation_horizon,    
         action_horizon=action_horizon
     )
-
-    # stats
     stats = dataset.stats
-    
-    # Loading state model
-    denoising_model = ConditionalUnet1D(input_dim=action_dim, global_cond_dim=action_dim * observation_dim, n_groups=2)
-    denoising_model.load_state_dict(torch.load("./saves/pusht_chkpt_80.pth"))
+
+    # Model
+    denoising_model = ConditionalUnet1D(
+        input_dim=action_dim,
+        global_cond_dim=observation_horizon * observation_dim,
+        n_groups=2
+    ).to(device)
+
+    denoising_model.load_state_dict(torch.load("./saves/pusht_chkpt_100.pth"))
     denoising_model.eval()
-    ema = EMAModel(model=denoising_model, power=0.75)
 
-    # Rewards and states
-    observation, info = env.reset()
-    
+    ema = EMAModel(parameters=denoising_model.parameters(), power=0.75)
+    ema.load_state_dict(torch.load("./saves/ema_chkpt_100.pth"))
+    ema.copy_to(denoising_model.parameters())
 
-    stats = dataset.stats
+    # Env loop
+    observation, _ = env.reset()
+    imgs = [env.render()]  # type: ignore
+    obs_deque = collections.deque([observation] * observation_horizon, maxlen=observation_horizon)
 
-    imgs = [env.render()] # type: ignore
-    obs_deque = collections.deque(
-        [observation] * observation_horizon, maxlen=observation_horizon
-    )
-
-    rewards = list()
+    rewards = []
     done = False
     step_idx = 0
     max_steps = 200
-    noise_sceduler = NoiseScheduler(num_timesteps=num_timesteps, beta_init=0.0001, beta_end=0.02)
+    noise_scheduler = NoiseScheduler(num_timesteps=num_timesteps)
 
-    with tqdm(total=max_steps, desc="Eval Pusht") as pbar:
+    with tqdm(total=max_steps, desc="Eval PushT") as pbar:
         while not done:
             
             B = 1
-            obs_sequence = np.stack(obs_deque)
-            nobs = torch.from_numpy(obs_sequence).to(device, dtype=torch.float32)
 
+            obs_sequence = np.stack(obs_deque)
+            nobs = normalize_data(obs_sequence, stats=stats['obs'])
+            nobs = torch.from_numpy(nobs).to(device, dtype=torch.float32)
 
             with torch.no_grad():
-                
-                # Getting random step
-                obs_cond = nobs.unsqueeze(0).flatten(start_dim = 1)
-                noisy_action = torch.randn((B, pred_horizon, action_dim), device = device)
-                naction = noisy_action
+
+                obs_cond = nobs.unsqueeze(0).flatten(start_dim=1)
+                naction = torch.randn((B, pred_horizon, action_dim), device=device)
 
                 # Denoising process
-                for t in reversed(range(num_timesteps)):
-                    
+                for t in range(num_timesteps):
                     noise_prediction = denoising_model(naction, t, obs_cond)
-                    naction, _ = noise_sceduler.reverse_process(naction, noise_prediction, t)
+                    naction, _ = noise_scheduler.reverse_process(
+                        naction, noise_prediction, t, var_type='random_initialization'
+                    )
+                    # naction = torch.clamp(naction, -1., 1.)
 
-            # getting action
-            naction = naction.detach().to('cpu').numpy()
-            naction = naction[0]
-           
+            # Unnormalize
+            naction = naction.squeeze(0).detach().cpu().numpy()
+            action_prediction = unnormalize_data(naction, stats=stats['action'])
 
-            # Action prediction
-            action_prediction = unnormalize_data(naction, stats = stats['action']) # i need to focus more, unormalize on action !
-            # actions
+
+            # Take first action_horizon steps
             start = observation_horizon - 1
             end = start + action_horizon
-            action = action_prediction[start:end,:]
+            action_seq = action_prediction[start:end, :]
 
-            for i in range(len(action)):
-
-                observation, reward, done, truncated, info = env.step(action[i])
+            for a in action_seq:
+                observation, reward, done, truncated, info = env.step(a)
                 obs_deque.append(observation)
-
                 rewards.append(reward)
                 imgs.append(env.render())
-
                 step_idx += 1
                 pbar.update(1)
-                pbar.set_postfix(reward = reward)
-                if step_idx > max_steps:
+                pbar.set_postfix(reward=reward)
+                if step_idx > max_steps or done:
                     done = True
-                if done:
                     break
-    
-    # print out the maximum target coverage
-    print('Score: ', max(rewards))
 
-    # visualize
-    from IPython.display import Video
+    print('Score:', max(rewards))
     vwrite('vis.mp4', imgs)
-    Video('vis.mp4', embed=True, width=256, height=256)
+    print("Saved rollout video as vis.mp4")
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Arguments for DDPM training')
+    parser = argparse.ArgumentParser(description='Arguments for DDPM inference')
     parser.add_argument('--config', dest='config_path', default='./config.yaml', type=str)
     args = parser.parse_args()
     infer(args)
