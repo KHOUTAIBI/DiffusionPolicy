@@ -3,11 +3,9 @@ import tqdm
 import argparse
 from torch.optim import AdamW
 from policy_diffusion_model import *
-import gymnasium as gym
 from dataset import *
 from diffusers.optimization import get_scheduler
 from diffusers.training_utils import EMAModel
-import os
 
 # Login using e.g. `huggingface-cli login` to access this dataset
 def collate_fn(batch):
@@ -39,7 +37,7 @@ def train(args):
     noise_prediction_model = ConditionalUnet1D(
         input_dim = action_dim,
         global_cond_dim = observation_dim * observation_horizon,
-        n_groups = 2
+        n_groups = 8
     ).to(device)
     ema = EMAModel(parameters=noise_prediction_model.parameters(), power=0.75)
 

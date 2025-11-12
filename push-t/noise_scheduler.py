@@ -13,19 +13,22 @@ class NoiseScheduler(nn.Module):
         self.num_timesteps = num_timesteps
         self.s = 0.008
 
-        # t ∈ [0, num_timesteps]
+        # Timesteps
         self.t = torch.linspace(0, num_timesteps, num_timesteps + 1, device=self.device)
         f = torch.cos(((self.t / num_timesteps + self.s) / (1 + self.s)) * np.pi / 2) ** 2
-        alpha_bar = f / f[0]  # normalized to start at 1
+        self.alpha_bar = f / f[0]  # normalized to start at 1
 
-        # beta_t = 1 - (alpha_bar_t / alpha_bar_{t-1})
-        self.alpha_bar = alpha_bar
-        self.betas = 1 - (self.alpha_bar / self.alpha_bar)
-        self.betas = torch.clamp(self.betas, 0.0001, 0.9999)
+        # Denoising functions
+        alpha_bar = self.alpha_bar
+        betas = torch.zeros(self.num_timesteps+1, device=self.device)
+        betas[1:] = 1.0 - (alpha_bar[1:] / alpha_bar[:-1])       
+        betas = betas.clamp(1e-6, 0.999)                        
+        self.betas = betas
+        self.alphas = 1.0 - self.betas                          
         
         self.alphas = 1.0 - self.betas
-        self.sqrt_alpha_bar = torch.sqrt(self.alpha_bar)
-        self.sqrt_one_minus_alpha_bar = torch.sqrt(1 - self.alpha_bar)
+        self.sqrt_alpha_bar = torch.sqrt(alpha_bar)
+        self.sqrt_one_minus_alpha_bar = torch.sqrt(1 - alpha_bar)
 
     # Adding noise to the image repeatedly
     def add_noise(self, original_input, noise, t):
@@ -40,34 +43,37 @@ class NoiseScheduler(nn.Module):
         return sqrt_alpha_bar * original_input + sqrt_one_minus_alpha_bar * noise
     
     # Reversing the process of noising
-    def reverse_process(self, xt, noise_prediction, t, var_type: str = 'random_initialization'):
-        """
-        Applies the reverse (denoising) process as described on page 4 of the DDPM paper.
-        """
-        assert var_type in ['random_initialization', 'deterministic_initialization']
-    
-        # Predict x0 from xt and the noise
-        x0 = (xt - self.sqrt_one_minus_alpha_bar.to(self.device)[t] * noise_prediction) / self.sqrt_alpha_bar[t]
-        x0 = torch.clamp(x0, -1.0, 1.0)
-        
-        # Compute the mean of q(x_{t-1} | x_t, x_0)
-        mean = (xt - (self.betas[t] * noise_prediction / self.sqrt_one_minus_alpha_bar[t])) / torch.sqrt(self.alphas[t])
-    
+    def reverse_process(self, x_t, eps_pred, t, var_type='random_initialization'):
 
-        # No noise added at the final step
+        # t: int in [0, T]
+        sqrt_ab_t   = self.sqrt_alpha_bar[t]
+        sqrt_1mab_t = self.sqrt_one_minus_alpha_bar[t]
+        alpha_t = self.alphas[t]
+        beta_t  = self.betas[t]
+
+        # predict x0 from ε
+        x0 = (x_t - sqrt_1mab_t * eps_pred) / sqrt_ab_t
+        x0 = torch.clamp(x0, -1.0, 1.0)  # optional
+
+
+        mean = (x_t - (beta_t / sqrt_1mab_t) * eps_pred) / torch.sqrt(alpha_t)
+
         if t == 0:
             return x0, mean
-    
-        if var_type == 'random_initialization':
-            variance = self.betas[t]
-        elif var_type == 'deterministic_initialization':
-            variance = torch.tensor(0.0)  # deterministic DDIM-style sampling
-    
-        sigma = torch.sqrt(variance)
-        z = torch.randn_like(xt).to(self.device)
-    
-        # Return next sample and denoised prediction
-        return mean + sigma * z, x0
+
+        alpha_bar_t   = self.alpha_bar[t]
+        alpha_bar_tm1 = self.alpha_bar[t-1]
+        beta_tilde = ((1.0 - alpha_bar_tm1) / (1.0 - alpha_bar_t)) * beta_t
+
+        if var_type == 'deterministic_initialization':
+            sigma = 0.0
+        else:
+            sigma = torch.sqrt(beta_tilde)
+
+        z = torch.randn_like(x_t)
+        x_prev = mean + sigma * z
+        return x_prev, x0
+
     
 
 

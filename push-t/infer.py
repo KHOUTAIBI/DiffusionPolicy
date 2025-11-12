@@ -1,29 +1,23 @@
-import torch
-from building_blocks import *
-import gymnasium as gym
-from tqdm import tqdm
 import collections
-import gym_pusht
+from building_blocks import *
 from dataset import *
 from noise_scheduler import * 
+import gymnasium as gym
+import gym_pusht
+from tqdm import tqdm
 from skvideo.io import vwrite 
 from diffusers.training_utils import EMAModel
 import argparse
 import numpy as np
-import gdown
-import os
 
-def infer(args):
+def infer():
     """
     Inference for the PushT DDPM policy
     """
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     env = gym.make("gym_pusht/PushT-v0", render_mode="rgb_array")
-    env.action_space.seed(100000)
-    observation, _ = env.reset()
-
-    # use a seed >200 to avoid initial states seen in the training dataset
+    observation, _ = env.reset(seed=100000)
 
     # Horizons
     num_timesteps = 100
@@ -42,27 +36,29 @@ def infer(args):
         action_horizon=action_horizon
     )
     stats = dataset.stats
+    print("env obs shape:", np.array(observation).shape)  # should be (5,)
+
 
     # Model
     denoising_model = ConditionalUnet1D(
         input_dim=action_dim,
         global_cond_dim=observation_horizon * observation_dim,
-        n_groups=2
-    ).to(device)
+        n_groups=8
+    ).to(device).eval() 
+    denoising_model.eval()
 
     denoising_model.load_state_dict(torch.load("./saves/pusht_chkpt_100.pth"))
-    denoising_model.eval()
+    
 
     ema = EMAModel(parameters=denoising_model.parameters(), power=0.75)
     ema.load_state_dict(torch.load("./saves/ema_chkpt_100.pth"))
     ema.copy_to(denoising_model.parameters())
 
     # Env loop
-    observation, _ = env.reset()
     imgs = [env.render()]  # type: ignore
     obs_deque = collections.deque([observation] * observation_horizon, maxlen=observation_horizon)
 
-    rewards = []
+    rewards = [] 
     done = False
     step_idx = 0
     max_steps = 200
@@ -72,7 +68,6 @@ def infer(args):
         while not done:
             
             B = 1
-
             obs_sequence = np.stack(obs_deque)
             nobs = normalize_data(obs_sequence, stats=stats['obs'])
             nobs = torch.from_numpy(nobs).to(device, dtype=torch.float32)
@@ -83,14 +78,16 @@ def infer(args):
                 naction = torch.randn((B, pred_horizon, action_dim), device=device)
 
                 # Denoising process
-                for t in range(num_timesteps):
+                for t in reversed(range(num_timesteps)):
+
                     noise_prediction = denoising_model(naction, t, obs_cond)
                     naction, _ = noise_scheduler.reverse_process(
-                        naction, noise_prediction, t, var_type='random_initialization'
+                        naction, noise_prediction, t
                     )
-                    # naction = torch.clamp(naction, -1., 1.)
+                    
 
             # Unnormalize
+            # naction = torch.clamp(naction, -1.0, 1.0)
             naction = naction.squeeze(0).detach().cpu().numpy()
             action_prediction = unnormalize_data(naction, stats=stats['action'])
 
@@ -98,10 +95,10 @@ def infer(args):
             # Take first action_horizon steps
             start = observation_horizon - 1
             end = start + action_horizon
-            action_seq = action_prediction[start:end, :]
+            action_seq = action_prediction[start : end, :]
 
             for a in action_seq:
-                observation, reward, done, truncated, info = env.step(a)
+                observation, reward, done, _, _ = env.step(a)
                 obs_deque.append(observation)
                 rewards.append(reward)
                 imgs.append(env.render())
@@ -121,4 +118,4 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Arguments for DDPM inference')
     parser.add_argument('--config', dest='config_path', default='./config.yaml', type=str)
     args = parser.parse_args()
-    infer(args)
+    infer()

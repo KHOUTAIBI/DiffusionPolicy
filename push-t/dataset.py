@@ -70,6 +70,7 @@ class PushTStateDataset(torch.utils.data.Dataset):
 
 def get_data_stats(data):
     
+    print(data.shape)
     data = data.reshape(-1, data.shape[-1])
     stats = {
         'min': np.min(data, axis=0),
