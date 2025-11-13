@@ -17,7 +17,7 @@ def infer():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     env = gym.make("gym_pusht/PushT-v0", render_mode="rgb_array")
-    observation, _ = env.reset(seed=100000)
+    observation, _ = env.reset()
 
     # Horizons
     num_timesteps = 100
