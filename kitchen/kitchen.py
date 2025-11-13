@@ -12,17 +12,18 @@ def train():
     """ 
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"Working on: {device}")
     # Loading dataset
     dataset = minari.load_dataset("D4RL/kitchen/partial-v2", download=True)
 
-    dataset_torch = MinariTransitionDataset(dataset)
-    B = 256
+    dataset_torch = MinariSequenceDataset(dataset, device=device)
+    
 
     loader = DataLoader(
         dataset_torch,
-        batch_size=B,
+        batch_size=256,
         shuffle=True,
-        num_workers=4,
+        num_workers=0,
         pin_memory=True,
     )
 
@@ -46,7 +47,7 @@ def train():
 
 
     prediction_horizon = observation_horizon * action_horizon
-    num_epochs = 100
+    num_epochs = 5
     num_steps = 100
     num_warmup_steps = 500
 
@@ -72,6 +73,7 @@ def train():
 
     tglobal = tqdm(range(num_epochs), desc='epoch', leave=False)
 
+    # ! Check if there is no prob in dims
     for epoch_indx in tglobal:
 
         tepoch = tqdm(loader, desc='batch', leave=False)
@@ -84,33 +86,35 @@ def train():
             # Going through batches
 
             optimizer.zero_grad()
-            normalized_observations = batch['observations']
-            normalized_actions = batch['actions'] 
+            normalized_observations = batch['observations'].to(device)
+            normalized_actions = batch['actions'].to(device)
+            B = normalized_observations.shape[0]
 
             normalized_observation_cond = normalized_observations[:, :observation_horizon, :]
             normalized_observation_cond = normalized_observations.flatten(start_dim = 1)
-                
+            
 
             t = torch.randint(0, num_steps, size=(B, ), device=device)
             noise = torch.rand_like(normalized_actions, device=device)
                 
             noisy_action = noise_scheduler.add_noise(normalized_actions, noise, t)
-            predicted_noise = denoising_model(noisy_action, normalized_observation_cond)
+            predicted_noise = denoising_model(noisy_action, t, normalized_observation_cond)
 
             loss = loss_func(predicted_noise, noise)
             loss.backward()
                 
             loss_cpu = loss.item()
             
+            tepoch.set_postfix(loss = loss_cpu)
             epoch_loss.append(loss_cpu)
 
             optimizer.step()
             lr_scheduler.step()
             ema.step(denoising_model.parameters())
-                
-        tepoch.set_postfix(loss = np.mean(epoch_loss))
         
-        if (epoch_indx + 1) % 10 == 0:
+        tglobal.set_postfix(loss=np.mean(epoch_loss))
+
+        if (epoch_indx + 1) % 5 == 0:
                 print(f"Finished epoch {epoch_indx+1}/{num_epochs} | Loss: {np.mean(epoch_loss):.4f}")
                 torch.save(denoising_model.state_dict(), f'./saves/pusht_chkpt_{epoch_indx + 1}.pth')
                 torch.save(ema.state_dict(), f'./saves/ema_chkpt_{epoch_indx + 1}.pth')

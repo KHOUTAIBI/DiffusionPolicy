@@ -53,7 +53,8 @@ class ConditionalRisidualBlock1D(nn.Module):
         scale = embedding[:, 0, ...]
         bias = embedding[:, 1, ...]
 
-        out = scale * out + bias
+        out = scale * out + bias # AX + B / I thought mask ?
+
         out = self.blocks[1](out)
         out = out + self.residual_conv(x)
 

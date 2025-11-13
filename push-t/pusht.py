@@ -57,12 +57,10 @@ def train(args):
     dataloader = torch.utils.data.DataLoader(
         dataset, #type: ignore  
         batch_size=256,
-        num_workers=1,
+        num_workers=0,
         shuffle=True,
         # accelerate cpu-gpu transfer
         pin_memory=True,
-        # don't kill worker process afte each epoch
-        persistent_workers=True
     )
 
     # optimizer
@@ -85,6 +83,8 @@ def train(args):
             epoch_loss = list()
             # batch loop
             
+            # ! THERE IS PROBLEM WITH LAST BATCH with dims wrong
+
             with tqdm.tqdm(dataloader, desc='Batch', leave=False) as tepoch:
                 
                 for nbatch in tepoch:

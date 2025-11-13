@@ -35,6 +35,8 @@ def infer():
         obs_horizon=observation_horizon,    
         action_horizon=action_horizon
     )
+
+    
     stats = dataset.stats
     print("env obs shape:", np.array(observation).shape)  # should be (5,)
 
@@ -45,7 +47,7 @@ def infer():
         global_cond_dim=observation_horizon * observation_dim,
         n_groups=8
     ).to(device).eval() 
-    denoising_model.eval()
+    
 
     denoising_model.load_state_dict(torch.load("./saves/pusht_chkpt_100.pth"))
     
