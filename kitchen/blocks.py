@@ -1,13 +1,13 @@
 import torch
+from convolution_embedding import *
 import torch.nn as nn
 import numpy as np
-from convolution_embedding import *
 
 # -------------------------------
 # Conditional Residual Block (fixed logic)
 # -------------------------------
 
-class ConditionalRisidualBlock1D(nn.Module):
+class ConditionalResidualBlock1D(nn.Module):
     """
     Conditional Residual Block with FiLM modulation.
     Matches the logic of the first version but keeps your naming and structure.
@@ -18,6 +18,7 @@ class ConditionalRisidualBlock1D(nn.Module):
                  conditional_dim, 
                  kernel_size=3,  
                  num_groups=8):
+        
         super().__init__()
 
         # Two convolutional layers with normalization + activation
@@ -40,6 +41,7 @@ class ConditionalRisidualBlock1D(nn.Module):
         self.residual_conv = nn.Conv1d(in_channels, out_channels, kernel_size=1) \
             if in_channels != out_channels else nn.Identity()
 
+
     def forward(self, x, conditioning):
         """
         x: [B, in_channels, T]
@@ -50,6 +52,8 @@ class ConditionalRisidualBlock1D(nn.Module):
         embedding = self.condition_encoder(conditioning)
         embedding = embedding.view(embedding.shape[0], 2, self.out_channels, 1)
 
+        # Here we consieder observation horizon of 2 ? 
+        # TODO Check the correctness of above statement
         scale = embedding[:, 0, ...]
         bias = embedding[:, 1, ...]
 
@@ -67,6 +71,7 @@ class ConditionalRisidualBlock1D(nn.Module):
 class DownSample1d(nn.Module):
     def __init__(self, dim, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.conv = nn.Conv1d(dim, dim, kernel_size=3, stride=2, padding=1)
     
     def forward(self, x):
@@ -95,8 +100,6 @@ class ConditionalUnet1D(nn.Module):
                  kernel_size=5,
                  n_groups=8,
                  *args, **kwargs):
-        
-
         super().__init__(*args, **kwargs)
 
         self.all_dims = [input_dim] + list(down_dims)
@@ -119,34 +122,45 @@ class ConditionalUnet1D(nn.Module):
 
         # Middle (bottleneck) blocks
         self.mid_modules = nn.ModuleList([
-            ConditionalRisidualBlock1D(mid_dim, mid_dim, conditional_dim=cond_dim, kernel_size=kernel_size, num_groups=n_groups),
-            ConditionalRisidualBlock1D(mid_dim, mid_dim, conditional_dim=cond_dim, kernel_size=kernel_size, num_groups=n_groups),
+            ConditionalResidualBlock1D(mid_dim, mid_dim, conditional_dim=cond_dim, kernel_size=kernel_size, num_groups=n_groups),
+            ConditionalResidualBlock1D(mid_dim, mid_dim, conditional_dim=cond_dim, kernel_size=kernel_size, num_groups=n_groups),
         ])
 
         # Downsampling path
         self.down_modules = nn.ModuleList([])
+
         for ind, (dim_in, dim_out) in enumerate(in_out):
+        
             is_last = ind == len(in_out) - 1
+        
             self.down_modules.append(nn.ModuleList([
-                ConditionalRisidualBlock1D(dim_in, dim_out, conditional_dim=cond_dim, kernel_size=kernel_size, num_groups=n_groups),
-                ConditionalRisidualBlock1D(dim_out, dim_out, conditional_dim=cond_dim, kernel_size=kernel_size, num_groups=n_groups),
+        
+                ConditionalResidualBlock1D(dim_in, dim_out, conditional_dim=cond_dim, kernel_size=kernel_size, num_groups=n_groups),
+                ConditionalResidualBlock1D(dim_out, dim_out, conditional_dim=cond_dim, kernel_size=kernel_size, num_groups=n_groups),
                 DownSample1d(dim_out) if not is_last else nn.Identity()
+        
             ]))
 
         # Upsampling path (mirror)
         self.up_modules = nn.ModuleList([])
+        
         for ind, (dim_in, dim_out) in enumerate(reversed(in_out[1:])):
+        
             is_last = ind == len(in_out) - 1
+        
             self.up_modules.append(nn.ModuleList([
-                ConditionalRisidualBlock1D(dim_out * 2, dim_in, conditional_dim=cond_dim, kernel_size=kernel_size, num_groups=n_groups),
-                ConditionalRisidualBlock1D(dim_in, dim_in, conditional_dim=cond_dim, kernel_size=kernel_size, num_groups=n_groups),
+                ConditionalResidualBlock1D(dim_out * 2, dim_in, conditional_dim=cond_dim, kernel_size=kernel_size, num_groups=n_groups),
+                ConditionalResidualBlock1D(dim_in, dim_in, conditional_dim=cond_dim, kernel_size=kernel_size, num_groups=n_groups),
                 UpSampleBlock1d(dim_in) if not is_last else nn.Identity()
+        
             ]))
 
         # Final convolution
         self.final_conv = nn.Sequential(
+        
             Convolution1D(self.start_dim, self.start_dim, kernel_size=kernel_size, norm_group=n_groups),
             nn.Conv1d(self.start_dim, input_dim, kernel_size=1),
+        
         )
 
         print(f"The number of params is: {np.sum([p.numel() for p in self.parameters()])}")
@@ -160,11 +174,14 @@ class ConditionalUnet1D(nn.Module):
         x = sample.moveaxis(-1, -2)  # (B, C, T)
 
         # Time embedding
+        
         if not torch.is_tensor(timesteps):
             timesteps = torch.tensor([timesteps], device=x.device)
+        
         elif timesteps.ndim == 0:
             timesteps = timesteps[None].to(x.device)
-
+        
+        # time embedding and global_feat    
         timesteps = timesteps.expand(x.shape[0])
         global_features = self.time_embedding(timesteps)
 
@@ -195,7 +212,6 @@ class ConditionalUnet1D(nn.Module):
         # Final conv
         x = self.final_conv(x)
         x = x.moveaxis(-1, -2)  # (B, T, input_dim)
-        
         return x
 
         
