@@ -41,7 +41,7 @@ def infer():
     num_warmup_steps = 500
     
     # Denoising model with Ema weights added
-    denoising_model = ConditionalUnet1D(input_dim=action_dim, global_cond_dim= observation_dim * observation_horizon).eval()
+    denoising_model = ConditionalUnet1D(input_dim=action_dim, global_cond_dim= observation_dim * observation_horizon).to(device).eval()
     denoising_model.load_state_dict(torch.load("./saves/pusht_chkpt_5.pth"))
     ema = EMAModel(parameters=denoising_model.parameters(), power=0.75)
     ema.load_state_dict(torch.load("./saves/ema_chkpt_5.pth"))
@@ -63,8 +63,14 @@ def infer():
     while not done:
         
         # Observation unormalization
-        observation_sequence = np.stack(observation_deque)
-        normalized_observation_sequence = dataset_torch._normalize_minmax_pm1(observation_sequence, dataset_torch.obs_min, dataset_torch.obs_min)
+        observation_sequence = np.array([obs['observation'] for obs in observation_deque])  # shape (horizon, obs_dim)
+
+        # Reshape min/max for broadcasting
+        obs_min = dataset_torch.obs_min.cpu().numpy().reshape(1, -1)  # (1, obs_dim)
+        obs_max = dataset_torch.obs_max.cpu().numpy().reshape(1, -1)  # (1, obs_dim)
+
+        # Normalize to [-1, 1]
+        normalized_observation_sequence = 2 * (observation_sequence - obs_min) / (obs_max - obs_min + 1e-8) - 1
         normalized_observation_sequence = torch.from_numpy(normalized_observation_sequence).to(device, dtype=torch.float32)
 
         with torch.no_grad():
@@ -77,10 +83,16 @@ def infer():
 
                 noise_prediction = denoising_model(normalized_action, t, observation_conditioning)
                 normalized_action, _ = noise_scheduler.reverse_process(normalized_action, noise_prediction, t = t)
-            
-        normalized_action = normalized_action.squeeze(0).detach().cpu().numpy()
-        action_prediction = dataset_torch._unormalize_data(normalized_action, observation=False, action=True)
 
+        # I have tried to fix array vs tensor and shape mismatches
+        normalized_action_tensor = normalized_action.squeeze(0)
+
+        action_prediction_tensor = normalized_action_tensor * (
+            dataset_torch.act_max.to(normalized_action_tensor.device) - dataset_torch.act_min.to(normalized_action_tensor.device)
+        ) + dataset_torch.act_min.to(normalized_action_tensor.device)
+
+        action_prediction = action_prediction_tensor.detach().cpu().numpy()
+        # -----------------------------------------------------------------
 
         start = observation_horizon - 1
         end = start + action_horizon
