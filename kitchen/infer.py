@@ -42,7 +42,7 @@ def infer():
     
     # Denoising model with Ema weights added
     denoising_model = ConditionalUnet1D(input_dim=action_dim, global_cond_dim= observation_dim * observation_horizon).eval()
-    denoising_model.load_state_dict(torch.load("./saves/model_100.pth"))
+    denoising_model.load_state_dict(torch.load("./saves/model_5.pth"))
     ema = EMAModel(parameters=denoising_model.parameters(), power=0.75)
     ema.load_state_dict(torch.load("./saves/ema_100.pth"))
     ema.copy_to(denoising_model.parameters())
