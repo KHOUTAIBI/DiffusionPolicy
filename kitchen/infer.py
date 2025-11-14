@@ -41,8 +41,8 @@ def infer():
     num_warmup_steps = 500
     
     # Denoising model with Ema weights added
-    denoising_model = ConditionalUnet1D(input_dim=action_dim, global_cond_dim= observation_dim * observation_horizon).to(device).eval()
-    denoising_model.load_state_dict(torch.load("./saves/pusht_chkpt_5.pth"))
+    denoising_model = ConditionalUnet1D(input_dim=action_dim, global_cond_dim= observation_dim * observation_horizon).eval()
+    denoising_model.load_state_dict(torch.load("./saves/kitchen_chkpt_5.pth"))
     ema = EMAModel(parameters=denoising_model.parameters(), power=0.75)
     ema.load_state_dict(torch.load("./saves/ema_chkpt_5.pth"))
     ema.copy_to(denoising_model.parameters())
@@ -63,14 +63,8 @@ def infer():
     while not done:
         
         # Observation unormalization
-        observation_sequence = np.array([obs['observation'] for obs in observation_deque])  # shape (horizon, obs_dim)
-
-        # Reshape min/max for broadcasting
-        obs_min = dataset_torch.obs_min.cpu().numpy().reshape(1, -1)  # (1, obs_dim)
-        obs_max = dataset_torch.obs_max.cpu().numpy().reshape(1, -1)  # (1, obs_dim)
-
-        # Normalize to [-1, 1]
-        normalized_observation_sequence = 2 * (observation_sequence - obs_min) / (obs_max - obs_min + 1e-8) - 1
+        observation_sequence = np.stack(observation_deque)
+        normalized_observation_sequence = dataset_torch._normalize_minmax_pm1(observation_sequence, dataset_torch.obs_min.detach().cpu().numpy(), dataset_torch.obs_min.detach().cpu().numpy())
         normalized_observation_sequence = torch.from_numpy(normalized_observation_sequence).to(device, dtype=torch.float32)
 
         with torch.no_grad():
