@@ -52,6 +52,7 @@ class ConditionalResidualBlock1D(nn.Module):
         embedding = self.condition_encoder(conditioning)
         embedding = embedding.view(embedding.shape[0], 2, self.out_channels, 1)
 
+
         # Here we consieder observation horizon of 2 ? 
         # TODO Check the correctness of above statement
         scale = embedding[:, 0, ...]
@@ -69,6 +70,7 @@ class ConditionalResidualBlock1D(nn.Module):
 # -------------------------------
 
 class DownSample1d(nn.Module):
+
     def __init__(self, dim, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -96,14 +98,16 @@ class ConditionalUnet1D(nn.Module):
                  input_dim,
                  global_cond_dim,
                  diffusion_step_embed_dim=256,
-                 down_dims=[256,512,1024],
+                 down_dims=[256, 512, 1024],
                  kernel_size=5,
                  n_groups=8,
                  *args, **kwargs):
+        
         super().__init__(*args, **kwargs)
 
         self.all_dims = [input_dim] + list(down_dims)
         self.start_dim = down_dims[0]
+
         self.diffusion_step_embedding_dimension = diffusion_step_embed_dim
         self.global_cond_dim = global_cond_dim
 
@@ -116,6 +120,7 @@ class ConditionalUnet1D(nn.Module):
         )
 
         cond_dim = diffusion_step_embed_dim + global_cond_dim
+        print(f"the condition dim is: {cond_dim}")
 
         in_out = list(zip(self.all_dims[:-1], self.all_dims[1:]))
         mid_dim = self.all_dims[-1]
@@ -185,6 +190,7 @@ class ConditionalUnet1D(nn.Module):
         timesteps = timesteps.expand(x.shape[0])
         global_features = self.time_embedding(timesteps)
 
+
         # Combine time + global conditioning
         if global_cond is not None:
             global_features = torch.cat([global_features, global_cond], dim = -1)
@@ -193,6 +199,7 @@ class ConditionalUnet1D(nn.Module):
 
         # Down path
         for resnet1, resnet2, downsample in self.down_modules: # type: ignore
+
             x = resnet1(x, global_features)
             x = resnet2(x, global_features)
             skip_connections.append(x)

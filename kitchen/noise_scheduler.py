@@ -20,7 +20,7 @@ class NoiseScheduler(nn.Module):
  
         # Denoising functions, we use the Cosine scheduler and clamped in the limits
         alpha_bar = self.alpha_bar
-        betas = torch.zeros(self.num_timesteps+1, device=self.device)
+        betas = torch.zeros(self.num_timesteps + 1, device=self.device)
         betas[1:] = 1.0 - (alpha_bar[1:] / alpha_bar[:-1])       
         betas = betas.clamp(1e-6, 0.999)                        
         

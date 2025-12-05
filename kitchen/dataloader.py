@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 class MinariSequenceDataset(Dataset):
     
-    def __init__(self, minari_dataset, obs_horizon=2, act_horizon=8, normalize=False, device = 'cuda'):
+    def __init__(self, minari_dataset, obs_horizon=2, act_horizon=8, normalize=True, device = 'cuda', *args, **kwargs):
 
         self.obs_horizon = obs_horizon
         self.act_horizon = act_horizon
@@ -82,18 +82,13 @@ class MinariSequenceDataset(Dataset):
         # [0,1] then [-1,1]
         return 2 * (x - x_min) / (x_max - x_min + eps) - 1
     
-    def _unormalize_data(self, x, observation = True, action = False):
+    def _unormalize_data(self, x, x_min, x_max):
         """
         Unormalize Data
         """
         x = (x + 1) / 2
-
-        if observation : 
-            unormalized_x = x * (self.obs_max - self.obs_min) + self.obs_min
-
-        if action :
-            unormalized_x = x * (self.act_max - self.act_min) + self.act_min
-        
+        unormalized_x = x * (x_max - x_min) + x_min
+            
         return unormalized_x
 
     def __len__(self):

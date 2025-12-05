@@ -11,103 +11,148 @@ from noise_scheduler import *
 from dataloader import MinariSequenceDataset
 from torch.utils.data import DataLoader
 import collections
+import numpy as np
 
 def infer():
     """
-    Infering the results kitchen results
+    Inferring Franka Kitchen results
     """
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     gym.register_envs(gymnasium_robotics)
-    env = gym.make('FrankaKitchen-v1', tasks_to_complete=['microwave', 'kettle'], render_mode = 'rgb_array')
-    observation, _ = env.reset(seed = 150000)
+    env = gym.make(
+        'FrankaKitchen-v1',
+        tasks_to_complete=['microwave', 'kettle', 'light switch', 'slide cabinet'],
+        render_mode='rgb_array',
+    )
     
-    # Importing data and such normalization
-    dataset = minari.load_dataset("D4RL/kitchen/partial-v2", download=True)
+    
+    observation_full, _ = env.reset(seed=150000)
+    observation = observation_full['observation']
 
-    dataset_torch = MinariSequenceDataset(dataset, device=device, normalize=True)
+    # Import dataset
+    dataset = minari.load_dataset("D4RL/kitchen/complete-v2", download=True)
 
-    # Observations
-    observation_dim = dataset.observation_space['observation'].shape[0]
     observation_horizon = 2
-
-    action_dim = dataset.action_space.shape[0]
     action_horizon = 8
-
-    prediction_horizon = observation_horizon * action_horizon
-    num_epochs = 5
-    num_steps = 100
-    num_warmup_steps = 500
     
-    # Denoising model with Ema weights added
-    denoising_model = ConditionalUnet1D(input_dim=action_dim, global_cond_dim= observation_dim * observation_horizon).eval()
-    denoising_model.load_state_dict(torch.load("./saves/kitchen_chkpt_5.pth"))
+    # IMPORTANT: must match training (normalize=True)
+    dataset_torch = MinariSequenceDataset(
+        dataset,
+        device=device,
+        normalize=True,
+        obs_horizon=observation_horizon,
+        act_horizon=action_horizon
+    )
+
+    # Dimensions
+    observation_dim = dataset.observation_space['observation'].shape[0]
+    action_dim = dataset.action_space.shape[0]
+
+    num_steps = 100  # diffusion steps
+    
+    # Denoising model + EMA
+    denoising_model = ConditionalUnet1D(
+        input_dim=action_dim,
+        global_cond_dim=observation_dim * observation_horizon,
+        down_dims=[472, 944, 1888],
+        diffusion_step_embed_dim=256
+    ).eval().to(device)
+
+    denoising_model.load_state_dict(torch.load("./saves/kitchen_chkpt_final.pth", map_location=device))
     ema = EMAModel(parameters=denoising_model.parameters(), power=0.75)
-    ema.load_state_dict(torch.load("./saves/ema_chkpt_5.pth"))
+    ema.load_state_dict(torch.load("./saves/ema_chkpt_final.pth", map_location=device))
     ema.copy_to(denoising_model.parameters())
 
-    done = False
     images = [env.render()]
-    observation_deque = collections.deque([observation] * observation_horizon, maxlen=observation_horizon)
+    observation_deque = collections.deque(
+        [observation] * observation_horizon,
+        maxlen=observation_horizon
+    )
 
-    rewards = list()
+    rewards = []
     done = False
     step_idx = 0
-    max_steps = 200
-    noise_scheduler = NoiseScheduler(num_timesteps=num_steps)
+    max_steps = 40
+    noise_scheduler = NoiseScheduler(num_timesteps=num_steps, device=device)
 
-    p_bar = tqdm(total=max_steps, desc="Eval PushT") 
+    p_bar = tqdm(total=max_steps, desc="Eval Kitchen") 
     B = 1
-    
+
+    # Normalization stats (tensors on device)
+    obs_min = dataset_torch.obs_min.to(device)
+    obs_max = dataset_torch.obs_max.to(device)
+    action_min = dataset_torch.act_min.to(device)
+    action_max = dataset_torch.act_max.to(device)
+
     while not done:
         
-        # Observation unormalization
-        observation_sequence = np.stack(observation_deque)
-        normalized_observation_sequence = dataset_torch._normalize_minmax_pm1(observation_sequence, dataset_torch.obs_min.detach().cpu().numpy(), dataset_torch.obs_min.detach().cpu().numpy())
-        normalized_observation_sequence = torch.from_numpy(normalized_observation_sequence).to(device, dtype=torch.float32)
+        # Build observation sequence as torch tensor
+        observation_sequence = torch.as_tensor(
+            np.stack(observation_deque),
+            dtype=torch.float32,
+            device=device,
+        )
+
+        # Normalize observations to [-1, 1]
+        normalized_observation_sequence = dataset_torch._normalize_minmax_pm1(
+            observation_sequence,
+            obs_min,
+            obs_max
+        )
 
         with torch.no_grad():
 
             observation_conditioning = normalized_observation_sequence.unsqueeze(0).flatten(start_dim=1)
-            normalized_action = torch.randn(size = (B, prediction_horizon, action_dim), device = device)
+            
+            # Start from Gaussian noise (same shape as training)
+            normalized_action = torch.randn(
+                size=(B, action_horizon, action_dim),
+                device=device
+            )
 
             # Denoising process
             for t in reversed(range(num_steps)):
-
                 noise_prediction = denoising_model(normalized_action, t, observation_conditioning)
-                normalized_action, _ = noise_scheduler.reverse_process(normalized_action, noise_prediction, t = t)
+                normalized_action, _ = noise_scheduler.reverse_process(
+                    normalized_action,
+                    noise_prediction,
+                    t=t
+                )
 
-        # I have tried to fix array vs tensor and shape mismatches
-        normalized_action_tensor = normalized_action.squeeze(0)
+        # Remove batch dim
+        normalized_action_tensor = normalized_action.squeeze(0)  # (T, act_dim)
 
-        action_prediction_tensor = normalized_action_tensor * (
-            dataset_torch.act_max.to(normalized_action_tensor.device) - dataset_torch.act_min.to(normalized_action_tensor.device)
-        ) + dataset_torch.act_min.to(normalized_action_tensor.device)
-
+        # Unnormalize actions back to original scale
+        action_prediction_tensor = dataset_torch._unormalize_data(
+            normalized_action_tensor,
+            action_min,
+            action_max
+        )
         action_prediction = action_prediction_tensor.detach().cpu().numpy()
-        # -----------------------------------------------------------------
 
-        start = observation_horizon - 1
-        end = start + action_horizon
-        action_sequences = action_prediction[start : end, :]
+        action_sequences = action_prediction[:action_horizon, :]
 
-        for action in action_prediction:
+        for action in action_sequences:
+            # Clip to env bounds for safety
+            action = np.clip(action, env.action_space.low, env.action_space.high)
 
             observation, reward, done, _, _ = env.step(action)             
-            observation_deque.append(observation)
+            observation_deque.append(observation['observation'])
             rewards.append(reward)
             images.append(env.render())
-            step_idx +=1
+            step_idx += 1
 
             p_bar.update(1)
-            p_bar.set_postfix(reward = reward)
+            p_bar.set_postfix(reward=float(reward))
 
-            if step_idx > max_steps :
+            if step_idx > max_steps:
                 done = True
                 break
         
-    print(f"Score = {max(rewards)}")
+        print(f"Current best score = {max(rewards):.3f}")
+    
     vwrite('kitchen.mp4', images)
     print("Saved video to: kitchen.mp4")
     print("Finished inference !")
