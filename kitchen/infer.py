@@ -4,7 +4,7 @@ import torch.nn as nn
 import gymnasium_robotics
 import gymnasium as gym
 from tqdm import tqdm
-from skvideo.io import vwrite 
+import imageio                     
 from diffusers.training_utils import EMAModel 
 from blocks import *
 from noise_scheduler import *
@@ -74,13 +74,13 @@ def infer():
     rewards = []
     done = False
     step_idx = 0
-    max_steps = 40
+    max_steps = 100
     noise_scheduler = NoiseScheduler(num_timesteps=num_steps, device=device)
 
     p_bar = tqdm(total=max_steps, desc="Eval Kitchen") 
     B = 1
 
-    # Normalization stats (tensors on device)
+    # Normalization stats
     obs_min = dataset_torch.obs_min.to(device)
     obs_max = dataset_torch.obs_max.to(device)
     action_min = dataset_torch.act_min.to(device)
@@ -106,7 +106,7 @@ def infer():
 
             observation_conditioning = normalized_observation_sequence.unsqueeze(0).flatten(start_dim=1)
             
-            # Start from Gaussian noise (same shape as training)
+            # Start from Gaussian noise
             normalized_action = torch.randn(
                 size=(B, action_horizon, action_dim),
                 device=device
@@ -122,9 +122,9 @@ def infer():
                 )
 
         # Remove batch dim
-        normalized_action_tensor = normalized_action.squeeze(0)  # (T, act_dim)
+        normalized_action_tensor = normalized_action.squeeze(0)
 
-        # Unnormalize actions back to original scale
+        # Unnormalize actions
         action_prediction_tensor = dataset_torch._unormalize_data(
             normalized_action_tensor,
             action_min,
@@ -135,7 +135,6 @@ def infer():
         action_sequences = action_prediction[:action_horizon, :]
 
         for action in action_sequences:
-            # Clip to env bounds for safety
             action = np.clip(action, env.action_space.low, env.action_space.high)
 
             observation, reward, done, _, _ = env.step(action)             
@@ -152,8 +151,8 @@ def infer():
                 break
         
         print(f"Current best score = {max(rewards):.3f}")
-    
-    vwrite('kitchen.mp4', images)
+
+    imageio.mimsave("kitchen.mp4", images, fps=30)
     print("Saved video to: kitchen.mp4")
     print("Finished inference !")
 
