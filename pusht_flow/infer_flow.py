@@ -49,11 +49,11 @@ def infer():
     ).to(device).eval() 
     
 
-    denoising_model.load_state_dict(torch.load("./saves/pusht_chkpt_100.pth"))
+    denoising_model.load_state_dict(torch.load("./saves/pusht_chkpt_final.pth"))
     
 
     ema = EMAModel(parameters=denoising_model.parameters(), power=0.75)
-    ema.load_state_dict(torch.load("./saves/ema_chkpt_100.pth"))
+    ema.load_state_dict(torch.load("./saves/ema_chkpt_final.pth"))
     ema.copy_to(denoising_model.parameters())
 
     # Env loop
@@ -85,12 +85,12 @@ def infer():
                 naction = torch.randn((B, pred_horizon, action_dim), device=device)
                 
                 # 3. Flow Matching Inference (ODE Solver)
-                num_inference_steps = 1000
+                num_inference_steps = 10
                 dt = 1.0 / num_inference_steps
                 
                 for i in range(num_inference_steps):
                     # Map step i to the model's expected timestep range [0, 100]
-                    t_index = int((i / num_inference_steps) * 100)
+                    t_index = int((i / num_inference_steps) * 10)
                     t_tensor = torch.tensor([t_index], device=device).expand(B)
                     
                     # Predict Velocity

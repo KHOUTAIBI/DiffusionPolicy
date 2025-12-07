@@ -22,8 +22,8 @@ def train():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Working on: {device}")
 
-    observation_horizon = 2
-    action_horizon = 8
+    observation_horizon = 8
+    action_horizon = 16
 
     # Loading dataset
     dataset = minari.load_dataset("D4RL/kitchen/complete-v2", download=True)

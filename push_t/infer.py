@@ -20,7 +20,7 @@ def infer():
     observation, _ = env.reset()
 
     # Horizons
-    num_timesteps = 100
+    num_timesteps = 10
     observation_dim = 5
     observation_horizon = 2
     action_dim = 2
@@ -49,11 +49,11 @@ def infer():
     ).to(device).eval() 
     
 
-    denoising_model.load_state_dict(torch.load("./saves/pusht_chkpt_100.pth"))
+    denoising_model.load_state_dict(torch.load("./saves/pusht_chkpt_80.pth"))
     
 
     ema = EMAModel(parameters=denoising_model.parameters(), power=0.75)
-    ema.load_state_dict(torch.load("./saves/ema_chkpt_100.pth"))
+    ema.load_state_dict(torch.load("./saves/ema_chkpt_80.pth"))
     ema.copy_to(denoising_model.parameters())
 
     # Env loop

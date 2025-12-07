@@ -42,7 +42,7 @@ def train(args):
     ).to(device)
     ema = EMAModel(parameters=noise_prediction_model.parameters(), power=0.75)
 
-    noise_scheduler = FlowScheduler(num_timesteps=100).to(device)    
+    noise_scheduler = FlowScheduler(num_timesteps=10).to(device)    
 
     # Login using e.g. `huggingface-cli login` to access this dataset
     dataset_path = "pusht_cchi_v7_replay.zarr.zip"
@@ -70,7 +70,7 @@ def train(args):
         name='cosine',
         optimizer=optimizer,
         num_warmup_steps=500,
-        num_training_steps=len(dataloader) * num_epochs
+        num_training_steps = len(dataloader) * num_epochs
     )
 
     print("----------------------------------")
@@ -149,8 +149,8 @@ def train(args):
 
             if (epoch_idx + 1) % 10 == 0:
                 print(f"Finished epoch {epoch_idx+1}/{num_epochs} | Loss: {np.mean(epoch_loss):.4f}")
-                torch.save(noise_prediction_model.state_dict(), f'./saves/pusht_chkpt_{epoch_idx + 1}.pth')
-                torch.save(ema.state_dict(), f'./saves/ema_chkpt_{epoch_idx + 1}.pth')
+                torch.save(noise_prediction_model.state_dict(), f'./saves/pusht_chkpt_final.pth')
+                torch.save(ema.state_dict(), f'./saves/ema_chkpt_final.pth')
         
         print("Finished training!")
 

@@ -41,7 +41,7 @@ def train(args):
     ).to(device)
     ema = EMAModel(parameters=noise_prediction_model.parameters(), power=0.75)
 
-    noise_scheduler = NoiseScheduler(num_timesteps=100).to(device)    
+    noise_scheduler = NoiseScheduler(num_timesteps=10).to(device)    
 
     # Login using e.g. `huggingface-cli login` to access this dataset
     dataset_path = "pusht_cchi_v7_replay.zarr.zip"
