@@ -1,6 +1,6 @@
 # DiffusionPolicy
 
-<img src="https://github.com/KHOUTAIBI/DiffusionPolicy/blob/main/gifs/pusht_gif.gif" width="250" height="250"/>     <img src="https://github.com/KHOUTAIBI/DiffusionPolicy/blob/main/gifs/kitchen_gif.gif" width="250" height="250"/>
+<img src="https://github.com/KHOUTAIBI/DiffusionPolicy/blob/main/gifs/pusht_gif.gif" width="300" height="300"/>     <img src="https://github.com/KHOUTAIBI/DiffusionPolicy/blob/main/gifs/kitchen_gif.gif" width="300" height="300"/>
 
 Code for experimenting with Diffusion Policy and related generative policies for visuomotor control on standard imitation-learning benchmarks (Kitchen / PushT), plus a small DDPM playground and report material.
 
