@@ -1,582 +1,405 @@
 % Unofficial Yale Poster template.
-
 % A fork of the UMich template https://www.overleaf.com/latex/templates/university-of-michigan-umich-poster-template/xpnqzzxwbjzc
-
 % which is fork of the MSU template https://www.overleaf.com/latex/templates/an-unofficial-poster-template-for-michigan-state-university/wnymbgpxnnwd
-
 % which is a fork of https://www.overleaf.com/latex/templates/an-unofficial-poster-template-for-new-york-university/krgqtqmzdqhg
-
 % which is a fork of https://github.com/anishathalye/gemini
-
 % also refer to https://github.com/k4rtik/uchicago-poster
-
-
-
-
 
 
 
 \documentclass[final]{beamer}
 
-
-
 % ====================
-
 % Packages
-
 % ====================
-
-
 
 \usepackage[T1]{fontenc}
-
 \usepackage{lmodern}
-
 \usepackage[size=custom, width=122,height=91, scale=1.2]{beamerposter}
-
 \usetheme{gemini}
-
+\usepackage{svg}
 \usecolortheme{msu}
-
 \usepackage{graphicx}
-
 \usepackage{booktabs}
-
 \usepackage{tikz}
-
 \usepackage{pgfplots}
-
 \pgfplotsset{compat=1.14}
-
 \usepackage{anyfontsize}
-
-
+\usepackage{xcolor}
+\definecolor{myHighlight}{RGB}{0,130,120}
+\definecolor{myDarkRed}{RGB}{180, 20, 20}
+\definecolor{myDarkGreen}{RGB}{0, 100, 40}
+\setbeamercolor{caption name}{fg=black}
 
 % ====================
-
 % Lengths
-
 % ====================
-
-
 
 % If you have N columns, choose \sepwidth and \colwidth such that
-
-% (N+1)\sepwidth + N\colwidth = \paperwidth
-
+% (N+1)*\sepwidth + N*\colwidth = \paperwidth
 \newlength{\sepwidth}
-
 \newlength{\colwidth}
-
 \setlength{\sepwidth}{0.025\paperwidth}
-
 \setlength{\colwidth}{0.3\paperwidth}
-
-
 
 \newcommand{\separatorcolumn}{\begin{column}{\sepwidth}\end{column}}
 
-
-
 % ====================
-
 % Title
-
 % ====================
 
+\title{
+  \resizebox{0.55\paperwidth}{!}{Diffusion Policy: Visuomotor Policy Learning via Action Diffusion}
+}
 
+% 2. YOUR NAMES:
+\author{Yacine Khalil \& Iliass Khoutaibi}
 
-\title{Diffusion Policy: Visuomotor Policy Learning via Action Diffusion}
-
-
-
-\author{Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun Du, Benjamin Burchfiel, Russ Tedrake \& Shuran Song1}
-
-
-
-\institute[shortinst]{}
-
-
-
-% ====================
-
-% Footer (optional)
+% 3. SUBTITLE (Original Authors):
+% We use \institute to place this text right below your names.
+\institute{
+  \large \textit{Based on the original paper by Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun Du, Benjamin Burchfiel, Russ Tedrake \& Shuran Song}
+}
 
 % ====================
-
-
+% Footer
+% ====================
 
 \footercontent{
+  \noindent
+  \begin{tabular*}{\paperwidth}{@{\hspace{1.5cm}} l @{\extracolsep{\fill}} c @{\extracolsep{\fill}} r @{\hspace{1.5cm}}}
+    
+    {\bfseries
+    \href{https://github.com/KHOUTAIBI/DiffusionPolicy}{github.com/KHOUTAIBI/DiffusionPolicy}
+    }
+    
+    &
+    
+    {\bfseries
+    11 December 2025 \;|\; Inria Paris (48 rue Barrault)
+    }
+    
+    &
+    
+    {\bfseries
+    \href{mailto:yacine.khalil@telecom-paris.fr}{yacine.khalil@telecom-paris.fr}
+    \quad
+    \href{mailto:iliass.khoutaibi@telecom-paris.fr}{iliass.khoutaibi@telecom-paris.fr}
+    }
+    
+  \end{tabular*}
+}
 
-  \href{https://github.com}{https://github.com/KHOUTAIBI/DiffusionPolicy} \hfill
-
-Poster Session \hfill
-
-  \href{mailto:youremail@yale.edu}{yacine.khalil@telecom-paris.fr}}
-
-% (can be left out to remove footer)
 
 
 
 % ====================
-
 % Logo (optional)
-
 % ====================
-
-
 
 % use this to include logos on the left and/or right side of the header:
-
 % Left: institution
-
-%  \logoright{\includegraphics[height=8cm]{logos/Logo_Télécom_ParisTech.svg}}
-
+\logoright{
+    \includegraphics[height=5.5cm]{figures/QR_code.pdf}
+    \hspace{0.4cm}
+    \includegraphics[height=5.5cm]{logos/Logo_Télécom_ParisTech.pdf}
+}
 % Right: funding agencies and other affilations 
-
-% \logoleft{\includegraphics[height=7cm]{logos/MVA.svg}}
-
+\logoleft{\includegraphics[height=6cm]{logos/MVA.pdf}}
 % ====================
-
 % Body
-
 % ====================
-
-
 
 \begin{document}
 
-
-
-
 \begin{frame}[t]
-
 \begin{columns}[t]
-
 \separatorcolumn
-
-
-
 
 
 \begin{column}{\colwidth}
 
-
-
+\vspace{-1cm}
 \begin{alertblock}{Objectives}
 
-
-
   \begin{itemize}
-
-    \item \textbf{Model robot control as a generative process}: Represent the motor policy as a conditional denoising diffusion model conditioned on observations.
-
+    \item \textbf{Visuomotor Policy as a Diffusion Process}: Reformulate robot policy learning as a conditional denoising diffusion process on the action space
     
-
-    \item \textbf{Learn expressive action distributions}: Capture complex, multimodal behavior by estimating the score function of the action space.
-
+    \item \textbf{Capture Multimodality \& Stability}: Overcome the limitations of Explicit Policies and IBC by naturally modeling multimodal action distributions with stable training dynamics
     
+    \item \textbf{Action Sequence Prediction}: Leverage the scalability of diffusion models to predict high-dimensional action sequences, ensuring temporal consistency and smoothness.
 
-    \item \textbf{Enable stable iterative action refinement}: Perform inference through stochastic Langevin dynamics steps to produce coherent, high-dimensional actions over time.
+    \item \textbf{Evaluate Architectures}: Systematically benchmark CNN-based and Transformer-based backbones across challenging tasks like Push-T and Franka Kitchen
 
+    \item \textcolor{myHighlight}{\textbf{Project main contribution}: \textbf{Investigate Flow Matching} as a deterministic alternative to Diffusion in order to improve inference speed.}
 
-
-    \item \textbf{Use differnet architectures for training}: Train the model on different complex architectures, such convolutions and transformers.
-
-
-
-    \item \textbf{Train differnet simulations}: Train the model on different simulations and see the results.
-
-\end{itemize}
-
-
+    \end{itemize}
 
 \end{alertblock}
 
-
-
-  \begin{block}{Introduction}
-
-
-
-    The paper introduces \textbf{Diffusion Policy}, a framework for generating robot behavior by modeling the control policy as a \emph{conditional denoising diffusion process}. Instead of directly predicting actions, the policy learns the \emph{score function} of the gradient field of the action distribution, allowing it to iteratively denoise latent action samples conditioned on visual observations. By progressively refining these samples, Diffusion Policy produces \textbf{smooth, coherent, and high-dimensional motor commands}, enabling robust performance across complex manipulation and visuomotor tasks.
-
-
-
-    % \begin{figure}
-
-    %     \centering
-
-    %     \includegraphics[width=1.0\linewidth]{figures/Figure_1.svg}
-
-    %     \caption{Diffusion Policy vs. other policies}
-
-    %     \label{fig:enter-label}
-
-    % \end{figure}
-
-
-
-
-
-  \end{block}
-
-
-
-\begin{block}{Theoretical background}
-
-
-
-Implicit policies represent the action distribution using an 
-
-\textbf{Energy-Based Model (EBM)}:
-
-\[
-
-p(\mathbf{a} \mid \mathbf{o}) = 
-
-\frac{e^{-E_{\theta}(\mathbf{o}, \mathbf{a})}}{Z(\mathbf{o}, \theta)},
-
-\]
-
-where \( Z(\mathbf{o},\theta) \) is an intractable normalization constant
-
-with respect to the action \(\mathbf{a}\).
-
-
-
-In the diffusion formulation, instead of directly optimizing the energy 
-
-function, the policy performs \emph{iterative denoising} of an initial noisy 
-
-action sample. Starting from \( \mathbf{x}_K \sim \mathcal{N}(0, I) \), the 
-
-diffusion model produces a sequence of progressively denoised actions
-
-\[
-
-\mathbf{x}K,\, \mathbf{x}{K-1},\, \dots,\, \mathbf{x}_1,\, \mathbf{x}_0,
-
-\]
-
-where \( \mathbf{x}_0 \) represents the final noise-free action conditioned on 
-
-the observation.
-
-
-
-Each denoising step follows the update rule
-
-\[
-
-\mathbf{x}_{k-1}
-
-= 
-
-\alpha_k \big( \mathbf{x}k - \gamma_k\, \varepsilon{\theta}(\mathbf{x}_k, k) \big) 
-
-\;+\; \mathcal{N}(0,\, \sigma_k^2 I),
-
-\]
-
-where \( \varepsilon_{\theta} \) predicts the noise component at timestep \( k \), 
-
-and \( \alpha_k, \gamma_k, \sigma_k \) are diffusion schedule parameters.
-
-
-
-This iterative refinement mirrors the gradient-based update of an 
-
-Energy-Based Model:
-
-\[
-
-\mathbf{x}' = \mathbf{x} - \eta\, \nabla E_{\theta}(\mathbf{x}),
-
-\]
-
-with the score function \( -\nabla_{\mathbf{a}} E_{\theta} \) approximated 
-
-by the diffusion model's noise predictor \( \varepsilon_{\theta} \). Thus, the 
-
-diffusion denoising steps can be viewed as performing implicit gradient 
-
-descent in the learned energy landscape of actions.
-
-
-
+\begin{block}{Introduction}
+
+\textbf{Diffusion Policy} reformulates visuomotor control as a \emph{conditional denoising diffusion process} in the action space, enabling expressive and stable policy learning.
+
+\vspace{0.5em}
+
+\begin{columns}
+    \begin{column}{0.48\linewidth}
+        \textcolor{myDarkRed}{\textbf{Problems Addressed:}}
+        \begin{itemize}
+            \item \textbf{Multimodality:} Standard policies (MSE loss) average multiple valid trajectories into a single, invalid action (e.g., going between two obstacles rather than around one).
+            \item \textbf{Training Instability:} Implicit behavior cloning (EBMs) requires negative sampling and is difficult to optimize.
+            \item \textbf{Temporal Consistency:} Single-step predictors often result in jittery motion.
+        \end{itemize}
+    \end{column}
     
+    \begin{column}{0.48\linewidth}
+        \textcolor{myDarkGreen}{\textbf{Key Idea:}}
+        \begin{itemize}
+            \item Instead of outputting actions directly, the policy learns the \emph{gradient of the data distribution} (score function).
+            \item It progressively denoises random gaussian noise into a coherent action sequence $ \mathbf{A}_t $.
+        \end{itemize}
+        
+        \vspace{0.5em}
+        \textcolor{myHighlight}{\textbf{Outcome:}} \textbf{+46.9\%} average success rate across 15 benchmarks compared to LSTM-GMM and BET.
+    \end{column}
+\end{columns}
+
+\vspace{0.5em}
+
+\begin{figure}
+    \centering
+    % The fcolorbox adds a white background behind the image to fix the contrast issue
+    \setlength{\fboxsep}{2pt} % Optional: small padding around image
+    \setlength{\fboxrule}{0pt}
+    \fcolorbox{white}{white}{\includegraphics[width=1.0\linewidth]{figures/teaser.png}}
+    
+    % Restored Caption
+    \caption{Comparison of policy representations. Diffusion Policy (right) denoises random actions through a learned gradient field.}
+    \label{fig:teaser}
+\end{figure}
 
 \end{block}
 
 
+\begin{block}{Receding Horizon Control (RHC)}
+
+    Unlike standard policies that predict a single step, Diffusion Policy predicts a \textbf{sequence} of actions $\mathbf{A}_t = \{\mathbf{a}_t, \dots, \mathbf{a}_{t+h}\}$.
+    
+    \vspace{0.3em}
+    
+    \textbf{Execution Strategy:}
+    We execute only the first $m$ steps of the predicted trajectory ($m < h$) before replanning based on the latest observation $\mathbf{O}_t$.
+    
+    \vspace{0.3em}
+    
+    This rapid replanning creates a \textbf{high-frequency feedback loop} (Loop Closure) that effectively rejects physical disturbances, while the sequence prediction ensures smooth, non-jittery motion.
+
+\end{block}
 
 \end{column}
 
-
-
 \separatorcolumn
 
-
-
 \begin{column}{\colwidth}
+\vspace{-1cm}
+\begin{block}{Theoretical Background}
 
+\textbf{1. Why Diffusion?}  
+- Implicit policies model the action distribution with an Energy-Based Model (EBM):  
+\[
+p(\mathbf{a}|\mathbf{o}) \propto e^{-E(\mathbf{o}, \mathbf{a})}.
+\]  
+- Direct minimization of $E$ is often unstable.
 
+\vspace{0.5em}
 
-  \begin{block}{Training and Inference}
+\textbf{2. Diffusion as Score Matching}  
+- Instead of learning $E$ directly, learn the \emph{score function}:
+\[
+\nabla_{\mathbf{a}} \log p(\mathbf{a}|\mathbf{o}) = -\nabla_{\mathbf{a}} E(\mathbf{o}, \mathbf{a})
+\]  
+- Conceptually, this is equivalent to learning how to "denoise" a latent action variable $\mathbf{A}^k$ over $K$ steps.
 
+\vspace{0.5em}
 
+\begin{minipage}[t]{0.48\linewidth}
+    \textbf{Training (Noise Prediction)}\\[0.3em]
+    - Network $\varepsilon_\theta$ predicts noise added to $\mathbf{A}^0$.  
+    - Loss:
+    \[
+    \mathcal{L} = \text{MSE}\Big( \varepsilon, \; \varepsilon_\theta(\mathbf{A}^k, k, \mathbf{O}) \Big)
+    \]  
+    - Forward model of noisy action:
+    \[
+    \mathbf{A}^k = \sqrt{\bar{\alpha}_k}\mathbf{A}^0 + \sqrt{1-\bar{\alpha}_k}\varepsilon
+    \]  
+\end{minipage}%
+\hfill
+\vrule width 0.5pt % thin vertical line
+\hfill
+\begin{minipage}[t]{0.48\linewidth}
+    \textbf{Inference (Iterative Denoising)}\\[0.3em]
+    - Start from Gaussian noise: $\mathbf{A}^K \sim \mathcal{N}(0, I)$.
+    - Iteratively refine the action:
+    \[
+    \mathbf{A}^{k-1} = \alpha_k (\mathbf{A}^k - \gamma_k \varepsilon_\theta(\mathbf{A}^k, k, \mathbf{O}_t)) + \sigma z
+    \]
+    \textcolor{myDarkRed}{$\rightarrow$ Requires $K$ forward passes!}
+\end{minipage}
 
-    \textbf{(a) General formulation.} 
+\end{block}
 
-        At timestep \( t \), the policy receives the latest \( T_o \) observations 
+\vspace{-0.5cm}
 
-        \( \mathbf{O}_t \) and predicts a sequence of \( T_a \) future actions 
+\begin{block}{Training and Inference}
 
-        \( \mathbf{A}_t \). This defines a conditional action-generation process 
+\textbf{(a) General Formulation}
+- At timestep \( t \), the policy observes the last \( T_o \) frames \( \mathbf{O}_t \).
+- It predicts a sequence of \( T_p \) future actions \( \mathbf{A}_t \) and executes \( T_a \) steps.
 
-        based on recent visual and proprioceptive context.
+\vspace{0.3em}
 
+\textbf{(b) CNN-based Diffusion Policy}  
+- Observation encoding \( \mathbf{O}_t \) conditions all conv layers via \emph{FiLM}.  
+- Start from noisy action \( \mathbf{A}^K_t \sim \mathcal{N}(0,I) \).  
+- Noise-prediction network \( \varepsilon_\theta \) iteratively denoises over \( K \) steps → final action \( \mathbf{A}^0_t \).
+
+\vspace{0.3em}
+
+\textbf{(c) Transformer-based Diffusion Policy}  
+- Observation embedding injected into each decoder block via cross-attention.  
+- Action embeddings use causal self-attention → each token sees only itself + previous actions.  
+- Ensures autoregressive consistency while conditioning on \( \mathbf{O}_t \).
+
+\vspace{0.3em}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/Figure_2.pdf}
+    \caption{Diffusion policy network architecture}
+\end{figure}
+
+\end{block}
+\vspace{-1.4cm}
+
+\begin{block}{Testing on PushT task}
+     We evaluated performance on the \textbf{PushT} benchmark, requiring precise multimodal pushing actions (going left vs. right).
+
+     \vspace{0.3em}
+
+     \begin{columns}[c] % [c] vertically centers all 3 images
         
-
-        \vspace{0.4em}
-
+        % --- 1. PushT Environment ---
+        \begin{column}{0.28\linewidth}
+            \centering
+            % Increased internal width to 0.95 since the column itself is narrower
+            \includegraphics[width=0.95\linewidth]{figures/PushT.pdf}
+            \vspace{0.2em} 
+            \textbf{\footnotesize Env. Setup}
+        \end{column}
         
-
-        \textbf{(b) CNN-based Diffusion Policy.} 
-
-        In the convolutional architecture, the observation encoding \( \mathbf{O}_t \) 
-
-        conditions every convolutional layer through 
-
-        \emph{FiLM} (Feature-wise Linear Modulation). Starting from a noisy action 
-
-        sample \( \mathbf{A}^K_t \sim \mathcal{N}(0,I) \), the noise-prediction network 
-
-        \( \varepsilon_{\theta} \) iteratively removes noise over \( K \) denoising         steps, 
-
-        yielding the final denoised action sequence \( \mathbf{A}^0_t \).
-
+        % --- 2. Multimodal Choice (NEW) ---
+        \begin{column}{0.28\linewidth}
+            \centering
+            \includegraphics[width=0.95\linewidth]{figures/multimodal_choice.pdf}
+            \vspace{0.2em}
+            \textbf{\footnotesize Multimodal Paths}
+        \end{column}
         
-
-        \vspace{0.4em}
-
+        % --- 3. Loss Plot ---
+        \begin{column}{0.40\linewidth}
+            \centering
+            \includegraphics[width=0.95\linewidth]{figures/loss_pusht_unet_transformer.pdf}
+            \vspace{0.2em}
+            \textbf{\footnotesize Training Loss}
+        \end{column}
         
-
-        \textbf{(c) Transformer-based Diffusion Policy.} 
-
-        In the transformer architecture, the embedding of \( \mathbf{O}_t \) is 
-
-        injected into each decoder block via multi-head cross-attention. Action 
-
-        embeddings use causal self-attention, meaning each action token attends only 
-
-        to itself and earlier actions. This enforces autoregressive consistency while 
-
-        conditioning the entire generation process on the current observation.
-
-
-
-        % \begin{figure}
-
-        %     \centering
-
-        %     \includegraphics[width=0.5\linewidth]{figures/Figure_2.svg}
-
-        %     \caption{Caption}
-
-        %     \label{fig:enter-label}
-
-        % \end{figure}
-
-
-
-  \end{block}
-
-
-
-  \begin{block}{Fusce aliquam magna velit}
-
-
-
-    Et rutrum ex euismod vel. Pellentesque ultricies, velit in fermentum
-
-    vestibulum, lectus nisi pretium nibh, sit amet aliquam lectus augue vel
-
-    velit. Suspendisse rhoncus massa porttitor augue feugiat molestie. Sed
-
-    molestie ut orci nec malesuada. Sed ultricies feugiat est fringilla
-
-    posuere.
-
-
-
-    % \begin{figure}
-
-    %   \centering
-
-    %     \includegraphics[width=0.3\textwidth]{}
-
-
-
-    %   \caption{Another figure caption.}
-
-    % \end{figure}
-
-
-
-  \end{block}
-
-
-
-  \begin{block}{Nam cursus consequat egestas}
-
-
-
-    Nulla eget sem quam. Ut aliquam volutpat nisi vestibulum convallis. Nunc a
-
-    lectus et eros facilisis hendrerit eu non urna. Interdum et malesuada fames
-
-    ac ante \textit{ipsum primis} in faucibus. Etiam sit amet velit eget sem
-
-    euismod tristique. Praesent enim erat, porta vel mattis sed, pharetra sed
-
-    ipsum. Morbi commodo condimentum massa, \textit{tempus venenatis} massa
-
-    hendrerit quis. Maecenas sed porta est. Praesent mollis interdum lectus,
-
-    sit amet sollicitudin risus tincidunt non.
-
-
-
-    Etiam sit amet tempus lorem, aliquet condimentum velit. Donec et nibh
-
-    consequat, sagittis ex eget, dictum orci. Etiam quis semper ante. Ut eu
-
-    mauris purus. Proin nec consectetur ligula. Mauris pretium molestie
-
-    ullamcorper. Integer nisi neque, aliquet et odio non, sagittis porta justo.
-
-
-
-    \begin{itemize}
-
-      \item \textbf{Sed consequat} id ante vel efficitur. Praesent congue massa
-
-        sed est scelerisque, elementum mollis augue iaculis.
-
-        \begin{itemize}
-
-          \item In sed est finibus, vulputate
-
-            nunc gravida, pulvinar lorem. In maximus nunc dolor, sed auctor eros
-
-            porttitor quis.
-
-          \item Fusce ornare dignissim nisi. Nam sit amet risus vel lacus
-
-            tempor tincidunt eu a arcu.
-
-          \item Donec rhoncus vestibulum erat, quis aliquam leo
-
-            gravida egestas.
-
-        \end{itemize}
-
-      \item \textbf{Sed luctus, elit sit amet} dictum maximus, diam dolor
-
-        faucibus purus, sed lobortis justo erat id turpis.
-
-      \item \textbf{Pellentesque facilisis dolor in leo} bibendum congue.
-
-        Maecenas congue finibus justo, vitae eleifend urna facilisis at.
-
-    \end{itemize}
-
-
-
-  \end{block}
-
-
+     \end{columns}
+\end{block}
 
 \end{column}
 
-
-
 \separatorcolumn
 
-
-
 \begin{column}{\colwidth}
+\vspace{-1cm}
+\begin{block}{Testing on Franka Kitchen task}
+     We evaluated performance on the \textbf{Franka Kitchen} benchmark, a challenging long-horizon task.
 
+     \vspace{0.3em}
 
+     \begin{columns}[c]
+        % --- Left: Environment ---
+        \begin{column}{0.4\linewidth}
+            \centering
+            \includegraphics[width=0.6\linewidth]{figures/franka_kitchen.pdf}
+            \vspace{0.2em}
+        \end{column}
+        
+        % --- Right: Loss Plot ---
+        \begin{column}{0.58\linewidth}
+            \centering
+            \includegraphics[width=0.65\linewidth]{figures/losses_unet_transformer.pdf}
+            \vspace{0.2em}
+        \end{column}
+     \end{columns}
+  \end{block}
+\vspace{-1.4cm}
+  \begin{block}{Diffusion Policy vs. Flow-matching Policy}
 
-  \begin{exampleblock}{A highlighted block containing some math}
-
-
-
-
-
-
-    \heading{A heading inside a block}
-
-
-
-
-    \heading{Another heading inside a block}
-
-
-
-
-  \end{exampleblock}
-
-
-
-  \begin{block}{Nullam vel erat at velit convallis laoreet}
-
-
+   \begin{figure}
+       \centering
+       \includegraphics[width=1.0\linewidth]{figures/flow_matching.png}
+       \caption{Concept of Flow-matching}
+       \label{fig:enter-label}
+   \end{figure}
+    \vspace{-0.8cm}
+    
 
     \begin{table}
-
       \centering
-
       \begin{tabular}{l r r c}
-
         \toprule
-
-        \textbf{First column} & \textbf{Second column} & \textbf{Third column} & \textbf{Fourth} \\
-
+        \textbf{Denoising process} & \textbf{Task} & \textbf{Inference time} & \textbf{Std} \\
         \midrule
-
-
+        DDPM & PushT & \textbf{1.2s} & 0.16s \\
+        Flow matching & PushT & \textbf{1.01s} & 0.13s \\
+        DDPM & Franka Kitchen & \textbf{8.02s} & 0.76s \\
+        Flow matching & Franka Kitchen & \textbf{6.82s} & 0.64s \\
         \bottomrule
-
       \end{tabular}
-
-      \caption{A table caption.}
-
+      \caption{Successful inference time using both denoising methods on the benchmarks}
     \end{table}
 
+  \end{block}
+\vspace{-1.4cm}
 
+\begin{block}{Conclusion \& Future Work}
+    Diffusion Policy achieves state-of-the-art visuomotor control by modeling multimodal actions with strong temporal consistency. Its main limitation is the high latency caused by iterative denoising.
 
+We show that \textbf{Flow Matching} offers a deterministic alternative, reducing inference time by $\approx \mathbf{15\%}$ on both benchmarks, with a slight drop in trajectory quality.
 
+\textbf{Limitations \& Future Work:}
+\begin{itemize}
+    \item \textbf{Real-World Gap:} Inference remains too slow for reliable deployment despite the speedup.
+    \item \textbf{No Exploration:} Unlike RL, the model does not explore the environment and relies solely on offline demonstrations.
+\end{itemize}
 
-
+  
   \end{block}
 
-
-
+\vspace{-1.4cm}
+    \begin{block}{References}
+    \vspace{-0.2cm}
+    \nocite{*}
+    \footnotesize{\bibliographystyle{plain}\bibliography{poster}}
+    
+    \end{block}
 
 \end{column}
 
-
-
 \separatorcolumn
-
-  \end{columns}
-
+\end{columns}
 \end{frame}
-
-
-
 \end{document}
