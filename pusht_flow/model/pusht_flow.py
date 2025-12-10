@@ -2,11 +2,11 @@ import yaml
 import tqdm
 import argparse
 from torch.optim import AdamW
-from dataset import *
+from model.dataset import *
 from diffusers.optimization import get_scheduler
 from diffusers.training_utils import EMAModel
-from building_blocks import *
-from flow_scheduler import *
+from architectures.building_blocks import *
+from architectures.flow_scheduler import *
 
 # Login using e.g. `huggingface-cli login` to access this dataset
 def collate_fn(batch):
@@ -78,6 +78,8 @@ def train(args):
     print("----------------------------------")
     
     with tqdm.tqdm(range(num_epochs), desc='Epoch') as tglobal:
+
+        total_loss = list()
         
         for epoch_idx in tglobal:
         
@@ -146,13 +148,17 @@ def train(args):
                     tepoch.set_postfix(loss=loss_cpu)
                     
             tglobal.set_postfix(loss=np.mean(epoch_loss))
+            total_loss.append(np.mean(epoch_loss))
 
             if (epoch_idx + 1) % 10 == 0:
                 print(f"Finished epoch {epoch_idx+1}/{num_epochs} | Loss: {np.mean(epoch_loss):.4f}")
                 torch.save(noise_prediction_model.state_dict(), f'./saves/pusht_chkpt_final.pth')
                 torch.save(ema.state_dict(), f'./saves/ema_chkpt_final.pth')
         
+        np.save("./loss_pusht_flow", total_loss)
         print("Finished training!")
+
+
 
 
 if __name__ == '__main__':

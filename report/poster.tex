@@ -1,0 +1,582 @@
+% Unofficial Yale Poster template.
+
+% A fork of the UMich template https://www.overleaf.com/latex/templates/university-of-michigan-umich-poster-template/xpnqzzxwbjzc
+
+% which is fork of the MSU template https://www.overleaf.com/latex/templates/an-unofficial-poster-template-for-michigan-state-university/wnymbgpxnnwd
+
+% which is a fork of https://www.overleaf.com/latex/templates/an-unofficial-poster-template-for-new-york-university/krgqtqmzdqhg
+
+% which is a fork of https://github.com/anishathalye/gemini
+
+% also refer to https://github.com/k4rtik/uchicago-poster
+
+
+
+
+
+
+
+\documentclass[final]{beamer}
+
+
+
+% ====================
+
+% Packages
+
+% ====================
+
+
+
+\usepackage[T1]{fontenc}
+
+\usepackage{lmodern}
+
+\usepackage[size=custom, width=122,height=91, scale=1.2]{beamerposter}
+
+\usetheme{gemini}
+
+\usecolortheme{msu}
+
+\usepackage{graphicx}
+
+\usepackage{booktabs}
+
+\usepackage{tikz}
+
+\usepackage{pgfplots}
+
+\pgfplotsset{compat=1.14}
+
+\usepackage{anyfontsize}
+
+
+
+% ====================
+
+% Lengths
+
+% ====================
+
+
+
+% If you have N columns, choose \sepwidth and \colwidth such that
+
+% (N+1)\sepwidth + N\colwidth = \paperwidth
+
+\newlength{\sepwidth}
+
+\newlength{\colwidth}
+
+\setlength{\sepwidth}{0.025\paperwidth}
+
+\setlength{\colwidth}{0.3\paperwidth}
+
+
+
+\newcommand{\separatorcolumn}{\begin{column}{\sepwidth}\end{column}}
+
+
+
+% ====================
+
+% Title
+
+% ====================
+
+
+
+\title{Diffusion Policy: Visuomotor Policy Learning via Action Diffusion}
+
+
+
+\author{Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun Du, Benjamin Burchfiel, Russ Tedrake \& Shuran Song1}
+
+
+
+\institute[shortinst]{}
+
+
+
+% ====================
+
+% Footer (optional)
+
+% ====================
+
+
+
+\footercontent{
+
+  \href{https://github.com}{https://github.com/KHOUTAIBI/DiffusionPolicy} \hfill
+
+Poster Session \hfill
+
+  \href{mailto:youremail@yale.edu}{yacine.khalil@telecom-paris.fr}}
+
+% (can be left out to remove footer)
+
+
+
+% ====================
+
+% Logo (optional)
+
+% ====================
+
+
+
+% use this to include logos on the left and/or right side of the header:
+
+% Left: institution
+
+%  \logoright{\includegraphics[height=8cm]{logos/Logo_Télécom_ParisTech.svg}}
+
+% Right: funding agencies and other affilations 
+
+% \logoleft{\includegraphics[height=7cm]{logos/MVA.svg}}
+
+% ====================
+
+% Body
+
+% ====================
+
+
+
+\begin{document}
+
+
+
+
+\begin{frame}[t]
+
+\begin{columns}[t]
+
+\separatorcolumn
+
+
+
+
+
+\begin{column}{\colwidth}
+
+
+
+\begin{alertblock}{Objectives}
+
+
+
+  \begin{itemize}
+
+    \item \textbf{Model robot control as a generative process}: Represent the motor policy as a conditional denoising diffusion model conditioned on observations.
+
+    
+
+    \item \textbf{Learn expressive action distributions}: Capture complex, multimodal behavior by estimating the score function of the action space.
+
+    
+
+    \item \textbf{Enable stable iterative action refinement}: Perform inference through stochastic Langevin dynamics steps to produce coherent, high-dimensional actions over time.
+
+
+
+    \item \textbf{Use differnet architectures for training}: Train the model on different complex architectures, such convolutions and transformers.
+
+
+
+    \item \textbf{Train differnet simulations}: Train the model on different simulations and see the results.
+
+\end{itemize}
+
+
+
+\end{alertblock}
+
+
+
+  \begin{block}{Introduction}
+
+
+
+    The paper introduces \textbf{Diffusion Policy}, a framework for generating robot behavior by modeling the control policy as a \emph{conditional denoising diffusion process}. Instead of directly predicting actions, the policy learns the \emph{score function} of the gradient field of the action distribution, allowing it to iteratively denoise latent action samples conditioned on visual observations. By progressively refining these samples, Diffusion Policy produces \textbf{smooth, coherent, and high-dimensional motor commands}, enabling robust performance across complex manipulation and visuomotor tasks.
+
+
+
+    % \begin{figure}
+
+    %     \centering
+
+    %     \includegraphics[width=1.0\linewidth]{figures/Figure_1.svg}
+
+    %     \caption{Diffusion Policy vs. other policies}
+
+    %     \label{fig:enter-label}
+
+    % \end{figure}
+
+
+
+
+
+  \end{block}
+
+
+
+\begin{block}{Theoretical background}
+
+
+
+Implicit policies represent the action distribution using an 
+
+\textbf{Energy-Based Model (EBM)}:
+
+\[
+
+p(\mathbf{a} \mid \mathbf{o}) = 
+
+\frac{e^{-E_{\theta}(\mathbf{o}, \mathbf{a})}}{Z(\mathbf{o}, \theta)},
+
+\]
+
+where \( Z(\mathbf{o},\theta) \) is an intractable normalization constant
+
+with respect to the action \(\mathbf{a}\).
+
+
+
+In the diffusion formulation, instead of directly optimizing the energy 
+
+function, the policy performs \emph{iterative denoising} of an initial noisy 
+
+action sample. Starting from \( \mathbf{x}_K \sim \mathcal{N}(0, I) \), the 
+
+diffusion model produces a sequence of progressively denoised actions
+
+\[
+
+\mathbf{x}K,\, \mathbf{x}{K-1},\, \dots,\, \mathbf{x}_1,\, \mathbf{x}_0,
+
+\]
+
+where \( \mathbf{x}_0 \) represents the final noise-free action conditioned on 
+
+the observation.
+
+
+
+Each denoising step follows the update rule
+
+\[
+
+\mathbf{x}_{k-1}
+
+= 
+
+\alpha_k \big( \mathbf{x}k - \gamma_k\, \varepsilon{\theta}(\mathbf{x}_k, k) \big) 
+
+\;+\; \mathcal{N}(0,\, \sigma_k^2 I),
+
+\]
+
+where \( \varepsilon_{\theta} \) predicts the noise component at timestep \( k \), 
+
+and \( \alpha_k, \gamma_k, \sigma_k \) are diffusion schedule parameters.
+
+
+
+This iterative refinement mirrors the gradient-based update of an 
+
+Energy-Based Model:
+
+\[
+
+\mathbf{x}' = \mathbf{x} - \eta\, \nabla E_{\theta}(\mathbf{x}),
+
+\]
+
+with the score function \( -\nabla_{\mathbf{a}} E_{\theta} \) approximated 
+
+by the diffusion model's noise predictor \( \varepsilon_{\theta} \). Thus, the 
+
+diffusion denoising steps can be viewed as performing implicit gradient 
+
+descent in the learned energy landscape of actions.
+
+
+
+    
+
+\end{block}
+
+
+
+\end{column}
+
+
+
+\separatorcolumn
+
+
+
+\begin{column}{\colwidth}
+
+
+
+  \begin{block}{Training and Inference}
+
+
+
+    \textbf{(a) General formulation.} 
+
+        At timestep \( t \), the policy receives the latest \( T_o \) observations 
+
+        \( \mathbf{O}_t \) and predicts a sequence of \( T_a \) future actions 
+
+        \( \mathbf{A}_t \). This defines a conditional action-generation process 
+
+        based on recent visual and proprioceptive context.
+
+        
+
+        \vspace{0.4em}
+
+        
+
+        \textbf{(b) CNN-based Diffusion Policy.} 
+
+        In the convolutional architecture, the observation encoding \( \mathbf{O}_t \) 
+
+        conditions every convolutional layer through 
+
+        \emph{FiLM} (Feature-wise Linear Modulation). Starting from a noisy action 
+
+        sample \( \mathbf{A}^K_t \sim \mathcal{N}(0,I) \), the noise-prediction network 
+
+        \( \varepsilon_{\theta} \) iteratively removes noise over \( K \) denoising         steps, 
+
+        yielding the final denoised action sequence \( \mathbf{A}^0_t \).
+
+        
+
+        \vspace{0.4em}
+
+        
+
+        \textbf{(c) Transformer-based Diffusion Policy.} 
+
+        In the transformer architecture, the embedding of \( \mathbf{O}_t \) is 
+
+        injected into each decoder block via multi-head cross-attention. Action 
+
+        embeddings use causal self-attention, meaning each action token attends only 
+
+        to itself and earlier actions. This enforces autoregressive consistency while 
+
+        conditioning the entire generation process on the current observation.
+
+
+
+        % \begin{figure}
+
+        %     \centering
+
+        %     \includegraphics[width=0.5\linewidth]{figures/Figure_2.svg}
+
+        %     \caption{Caption}
+
+        %     \label{fig:enter-label}
+
+        % \end{figure}
+
+
+
+  \end{block}
+
+
+
+  \begin{block}{Fusce aliquam magna velit}
+
+
+
+    Et rutrum ex euismod vel. Pellentesque ultricies, velit in fermentum
+
+    vestibulum, lectus nisi pretium nibh, sit amet aliquam lectus augue vel
+
+    velit. Suspendisse rhoncus massa porttitor augue feugiat molestie. Sed
+
+    molestie ut orci nec malesuada. Sed ultricies feugiat est fringilla
+
+    posuere.
+
+
+
+    % \begin{figure}
+
+    %   \centering
+
+    %     \includegraphics[width=0.3\textwidth]{}
+
+
+
+    %   \caption{Another figure caption.}
+
+    % \end{figure}
+
+
+
+  \end{block}
+
+
+
+  \begin{block}{Nam cursus consequat egestas}
+
+
+
+    Nulla eget sem quam. Ut aliquam volutpat nisi vestibulum convallis. Nunc a
+
+    lectus et eros facilisis hendrerit eu non urna. Interdum et malesuada fames
+
+    ac ante \textit{ipsum primis} in faucibus. Etiam sit amet velit eget sem
+
+    euismod tristique. Praesent enim erat, porta vel mattis sed, pharetra sed
+
+    ipsum. Morbi commodo condimentum massa, \textit{tempus venenatis} massa
+
+    hendrerit quis. Maecenas sed porta est. Praesent mollis interdum lectus,
+
+    sit amet sollicitudin risus tincidunt non.
+
+
+
+    Etiam sit amet tempus lorem, aliquet condimentum velit. Donec et nibh
+
+    consequat, sagittis ex eget, dictum orci. Etiam quis semper ante. Ut eu
+
+    mauris purus. Proin nec consectetur ligula. Mauris pretium molestie
+
+    ullamcorper. Integer nisi neque, aliquet et odio non, sagittis porta justo.
+
+
+
+    \begin{itemize}
+
+      \item \textbf{Sed consequat} id ante vel efficitur. Praesent congue massa
+
+        sed est scelerisque, elementum mollis augue iaculis.
+
+        \begin{itemize}
+
+          \item In sed est finibus, vulputate
+
+            nunc gravida, pulvinar lorem. In maximus nunc dolor, sed auctor eros
+
+            porttitor quis.
+
+          \item Fusce ornare dignissim nisi. Nam sit amet risus vel lacus
+
+            tempor tincidunt eu a arcu.
+
+          \item Donec rhoncus vestibulum erat, quis aliquam leo
+
+            gravida egestas.
+
+        \end{itemize}
+
+      \item \textbf{Sed luctus, elit sit amet} dictum maximus, diam dolor
+
+        faucibus purus, sed lobortis justo erat id turpis.
+
+      \item \textbf{Pellentesque facilisis dolor in leo} bibendum congue.
+
+        Maecenas congue finibus justo, vitae eleifend urna facilisis at.
+
+    \end{itemize}
+
+
+
+  \end{block}
+
+
+
+\end{column}
+
+
+
+\separatorcolumn
+
+
+
+\begin{column}{\colwidth}
+
+
+
+  \begin{exampleblock}{A highlighted block containing some math}
+
+
+
+
+
+
+    \heading{A heading inside a block}
+
+
+
+
+    \heading{Another heading inside a block}
+
+
+
+
+  \end{exampleblock}
+
+
+
+  \begin{block}{Nullam vel erat at velit convallis laoreet}
+
+
+
+    \begin{table}
+
+      \centering
+
+      \begin{tabular}{l r r c}
+
+        \toprule
+
+        \textbf{First column} & \textbf{Second column} & \textbf{Third column} & \textbf{Fourth} \\
+
+        \midrule
+
+
+        \bottomrule
+
+      \end{tabular}
+
+      \caption{A table caption.}
+
+    \end{table}
+
+
+
+
+
+
+  \end{block}
+
+
+
+
+\end{column}
+
+
+
+\separatorcolumn
+
+  \end{columns}
+
+\end{frame}
+
+
+
+\end{document}

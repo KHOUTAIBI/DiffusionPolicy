@@ -440,3 +440,8 @@ data/
 yaml
 saves/
 samples/
+images/
+numpy_saves/
+*.npy
+videos/
+

@@ -85,10 +85,12 @@ def train():
 
     tglobal = tqdm(range(num_epochs), desc='epoch', leave=False)
 
+    total_loss = list()
     for epoch_indx in tglobal:
 
         tepoch = tqdm(loader, desc='batch', leave=False)
         epoch_loss = []
+
 
         for batch in tepoch:
 
@@ -117,6 +119,8 @@ def train():
             ema.step(denoising_model.parameters())
         
         mean_epoch_loss = float(np.mean(epoch_loss))
+        total_loss.append(np.mean(epoch_loss))
+        print(total_loss)
         tglobal.set_postfix(loss=mean_epoch_loss)
 
         if (epoch_indx + 1) % 10 == 0:
@@ -125,6 +129,7 @@ def train():
             torch.save(denoising_model.state_dict(), './saves/kitchen_chkpt_final.pth')
             torch.save(ema.state_dict(), './saves/ema_chkpt_final.pth')
         
+    np.save("losses_kitchen_unet", np.array(total_loss))
     print("Finished training!")
 
 

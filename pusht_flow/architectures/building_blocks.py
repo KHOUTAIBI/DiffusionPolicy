@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from convolution_embedding import *
+from architectures.convolution_embedding import *
 
 # -------------------------------
 # Conditional Residual Block (fixed logic)

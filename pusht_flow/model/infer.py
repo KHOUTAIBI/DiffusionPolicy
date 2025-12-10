@@ -1,7 +1,7 @@
 import collections
-from building_blocks import *
-from dataset import *
-from noise_scheduler import * 
+from architectures.building_blocks import *
+from model.dataset import *
+from architectures.noise_scheduler import * 
 import gymnasium as gym
 import gym_pusht
 from tqdm import tqdm

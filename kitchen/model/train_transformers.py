@@ -32,7 +32,7 @@ def train():
     num_progress_levels = 5   # 0,1,2,3,4
 
     # --- load dataset ---
-    dataset = minari.load_dataset("D4RL/kitchen/partial-v2", download=True)
+    dataset = minari.load_dataset("D4RL/kitchen/complete-v2", download=True)
     dataset_torch = MinariSequenceDataset(
         dataset,
         obs_horizon=observation_horizon,
@@ -62,7 +62,7 @@ def train():
         break
 
     # --- training hyperparams ---
-    num_epochs = 500
+    num_epochs = 100
     num_steps = 100            # diffusion steps
     num_warmup_steps = 1000
     max_grad_norm = 1.0
@@ -113,8 +113,10 @@ def train():
 
     tglobal = tqdm(range(num_epochs), desc="epoch", leave=False)
     global_step = 0
+    total_loss = list()
 
     for epoch_idx in tglobal:
+
         tepoch = tqdm(loader, desc="batch", leave=False)
         epoch_loss = []
 
@@ -186,10 +188,8 @@ def train():
 
         mean_loss = float(np.mean(epoch_loss))
         tglobal.set_postfix(loss=mean_loss)
-
-        with torch.no_grad():
-            print("rewards window:", rewards[0])
-            print("progress_id:", progress_id[0].item())
+        
+        total_loss.append(mean_loss)
 
         if (epoch_idx + 1) % 10 == 0:
             print(f"Finished epoch {epoch_idx+1}/{num_epochs} | Loss: {mean_loss:.4f}")
@@ -197,6 +197,7 @@ def train():
             torch.save(denoising_model.state_dict(), "./saves/kitchen_transformer_chkpt.pth")
             torch.save(ema.state_dict(), "./saves/ema_transformer_chkpt.pth")
 
+    np.save("total_loss_transformer", total_loss)
     print("Finished training Transformer with progress conditioning!")
 
 

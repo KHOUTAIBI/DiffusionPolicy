@@ -6,6 +6,7 @@ from policy_diffusion_model import *
 from dataset import *
 from diffusers.optimization import get_scheduler
 from diffusers.training_utils import EMAModel
+import matplotlib.pyplot as plt
 
 # Login using e.g. `huggingface-cli login` to access this dataset
 def collate_fn(batch):
@@ -77,6 +78,8 @@ def train(args):
     print("----------------------------------")
     
     with tqdm.tqdm(range(num_epochs), desc='Epoch') as tglobal:
+
+        total_loss = list()
         
         for epoch_idx in tglobal:
         
@@ -136,13 +139,25 @@ def train(args):
                     tepoch.set_postfix(loss=loss_cpu)
                     
             tglobal.set_postfix(loss=np.mean(epoch_loss))
+            total_loss.append(np.mean(epoch_loss))
 
             if (epoch_idx + 1) % 10 == 0:
                 print(f"Finished epoch {epoch_idx+1}/{num_epochs} | Loss: {np.mean(epoch_loss):.4f}")
                 torch.save(noise_prediction_model.state_dict(), f'./saves/pusht_chkpt_{epoch_idx + 1}.pth')
                 torch.save(ema.state_dict(), f'./saves/ema_chkpt_{epoch_idx + 1}.pth')
         
+        
         print("Finished training!")
+        total_loss = np.array(total_loss)
+        np.save("./loss_pusht_ddpm", total_loss)
+        plt.plot(np.arange(total_loss.shape[0]), total_loss)
+        plt.xlabel("epoch")
+        plt.ylabel("loss mean")
+        plt.title("Mean loss for PushT task trained on DDPM")
+        plt.legend()
+        plt.show()
+        plt.savefig("loss_pusht_ddpm.svg")
+
 
 
 if __name__ == '__main__':
